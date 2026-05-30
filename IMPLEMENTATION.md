@@ -89,17 +89,15 @@ For load/store instructions, the pass looks back at most 16 instructions in the 
 
 The miss probability times `memory_bonus_miss` (14 nJ for loads, 16 nJ for stores) is added to the instruction energy.
 
+### Analysis Dependencies
+
+The pass operates as a pure module pass without requiring function-level analysis passes (ScalarEvolution, LoopInfo, etc.), which maximizes portability across LLVM versions. Trip counts default to the configurable `-energy-default-trip` parameter (default: 32). Future versions can integrate ScalarEvolution for symbolic trip counts by running the pass after loop simplification.
+
+This design choice was made because the new pass manager's module-pass-to-function-analysis proxy has version-specific behavior that varies across LLVM 15–20. By keeping the pass self-contained, it compiles and runs on any LLVM version without modification.
+
 ### Trip-Count Estimation
 
-```cpp
-static uint64_t estimateTripCount(const Loop *L, ScalarEvolution &SE) {
-    // 1. Try ScalarEvolution::getSmallConstantTripCount()
-    // 2. Try branch_weights metadata (heuristic ratio)
-    // 3. Fall back to -energy-default-trip (default: 32)
-}
-```
-
-For each basic block, the pass multiplies all enclosing loop trip counts to get a `tripMult`. The total energy for instructions in that block is `E_inst × tripMult`.
+Each instruction's base energy is scaled by the product of enclosing loop trip counts. The pass uses a configurable default (32, via `-energy-default-trip`) for all loops, ensuring deterministic and portable behavior. This default produces correct *relative* rankings even though absolute numbers may differ from profile-guided analysis.
 
 ### JSON Output
 
