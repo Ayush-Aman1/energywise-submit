@@ -16,6 +16,11 @@ EnergyWise is an LLVM compiler pass that statically estimates the electrical ene
 pip3 install pyyaml
 ```
 
+On macOS/Linux, make the scripts executable:
+```bash
+chmod +x build.sh run.sh
+```
+
 ### Run the Simulator
 
 The Python simulator parses C source and estimates energy without LLVM:
@@ -68,14 +73,16 @@ cd ..\..
 python src\energywise.py --mode native testcases\matmul.c
 ```
 
-### Run with the LLVM Plugin
+### Run with the LLVM Plugin (Manual)
+
+The Python driver (`--mode native`) handles `clang` and `opt` path detection automatically. To run the pass manually:
 
 ```bash
 # Step 1: Compile C to LLVM IR
 clang --target=riscv32-unknown-elf -march=rv32imc -S -emit-llvm -O1 \
     -o testcases/matmul.ll testcases/matmul.c
 
-# Step 2: Run the energy pass
+# Step 2: Run the energy pass (use .so on Linux, .dylib on macOS, .dll on Windows)
 opt -load-pass-plugin src/build/libEnergyWise.so \
     -passes=energywise \
     -energy-model=models/rv32imc_energy.yaml \
@@ -91,8 +98,10 @@ opt -load-pass-plugin src/build/libEnergyWise.so \
 ├── DESIGN.md
 ├── IMPLEMENTATION.md
 ├── EVALUATION.md
-├── build.sh                      Build the LLVM plugin + install Python deps
-├── run.sh                         Run all test cases and print comparison table
+├── build.sh                       Build LLVM plugin + install deps (macOS/Linux)
+├── build.bat                      Build LLVM plugin (Windows)
+├── run.sh                         Run all benchmarks (macOS/Linux)
+├── run.bat                        Run all benchmarks (Windows)
 ├── src/
 │   ├── EnergyEstimationPass.cpp   LLVM new-PM plugin (C++17)
 │   ├── CMakeLists.txt             Out-of-tree build for the plugin
@@ -147,7 +156,7 @@ python3 src/energywise.py <source.c> [options]
   --mode sim|native       sim = Python simulator (default), native = LLVM pass
   --model <path>          Path to energy model YAML (default: models/rv32imc_energy.yaml)
   --report <path>         Output JSON report path (default: reports/<name>.json)
-  --plugin <path>         Path to LLVM plugin .so/.dylib (native mode)
+  --plugin <path>         Path to LLVM plugin (.so/.dylib/.dll) (native mode)
   --default-trip <N>      Fallback loop trip count (default: 32)
   --pretty                 Pretty-print JSON output
 ```
@@ -170,7 +179,7 @@ The pass walks every Function → BasicBlock → Instruction in the LLVM IR (or,
 2. **Apply** the per-instruction energy cost from the YAML model: `E = E_base + α_switch × E_switch`
 3. **Weight** by switching-activity heuristics: constant operands (0.3×), induction variables (0.6×), phi nodes (1.2×)
 4. **Add** memory miss penalty: `+ p_miss × E_miss_bonus` where p_miss is estimated by a local reuse-distance heuristic
-5. **Multiply** by the loop trip-count product from ScalarEvolution (or a configurable fallback)
+5. **Multiply** by the loop trip-count product (configurable fallback, default 32 iterations per loop)
 6. **Emit** a per-function JSON report with total energy, dynamic instruction count, hottest block, and per-class breakdowns
 
 ## Limitations
