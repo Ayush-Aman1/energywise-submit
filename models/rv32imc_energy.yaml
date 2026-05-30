@@ -1,0 +1,96 @@
+# EnergyWise RISC-V rv32imc Energy Model
+# Units: nanojoules (nJ) per instruction, based on a 1V / 100 MHz in-order core
+# Provenance: calibrated against published measurements for similar
+# in-order RV32IMC cores (PULP/Ibex-class) + linear regression refinement.
+# See docs/MODEL_CALIBRATION.md for methodology.
+#
+# Format notes:
+#   base_nj       : intrinsic energy per issue
+#   switching_nj  : additional energy modeling operand-bit toggling (approx.)
+#   memory_bonus  : extra cost for cache-miss-likely accesses
+#   context_tags  : labels applied by the pass for later exploration
+
+meta:
+  name: rv32imc_pulp_like
+  version: 0.3
+  voltage_v: 1.0
+  frequency_mhz: 100
+  baseline_leakage_nj_per_cycle: 0.012
+  calibration_rms_error_pct: 6.8     # vs. gem5 + McPAT reference traces
+  notes: |
+    Energy numbers are *relative* within this model. Absolute values are
+    only meaningful when normalized to the reference run in the report.
+
+# ---- Integer arithmetic (RV32I) ----
+instructions:
+  add:   { base_nj: 0.42, switching_nj: 0.08, class: alu_int, pipeline_stage: EX }
+  sub:   { base_nj: 0.43, switching_nj: 0.08, class: alu_int, pipeline_stage: EX }
+  xor:   { base_nj: 0.38, switching_nj: 0.07, class: alu_int, pipeline_stage: EX }
+  or:    { base_nj: 0.38, switching_nj: 0.07, class: alu_int, pipeline_stage: EX }
+  and:   { base_nj: 0.38, switching_nj: 0.07, class: alu_int, pipeline_stage: EX }
+  sll:   { base_nj: 0.45, switching_nj: 0.10, class: alu_shift, pipeline_stage: EX }
+  srl:   { base_nj: 0.45, switching_nj: 0.10, class: alu_shift, pipeline_stage: EX }
+  sra:   { base_nj: 0.46, switching_nj: 0.10, class: alu_shift, pipeline_stage: EX }
+  slt:   { base_nj: 0.40, switching_nj: 0.07, class: alu_cmp,   pipeline_stage: EX }
+  sltu:  { base_nj: 0.40, switching_nj: 0.07, class: alu_cmp,   pipeline_stage: EX }
+
+  addi:  { base_nj: 0.40, switching_nj: 0.06, class: alu_int, pipeline_stage: EX }
+  xori:  { base_nj: 0.37, switching_nj: 0.05, class: alu_int, pipeline_stage: EX }
+  ori:   { base_nj: 0.37, switching_nj: 0.05, class: alu_int, pipeline_stage: EX }
+  andi:  { base_nj: 0.37, switching_nj: 0.05, class: alu_int, pipeline_stage: EX }
+  slli:  { base_nj: 0.43, switching_nj: 0.08, class: alu_shift, pipeline_stage: EX }
+  srli:  { base_nj: 0.43, switching_nj: 0.08, class: alu_shift, pipeline_stage: EX }
+  srai:  { base_nj: 0.44, switching_nj: 0.08, class: alu_shift, pipeline_stage: EX }
+  lui:   { base_nj: 0.25, switching_nj: 0.04, class: alu_int, pipeline_stage: EX }
+  auipc: { base_nj: 0.28, switching_nj: 0.05, class: alu_int, pipeline_stage: EX }
+
+# ---- M extension (multiply/divide are the big hitters) ----
+  mul:    { base_nj: 2.10, switching_nj: 0.35, class: alu_mul, pipeline_stage: EX, latency_cycles: 3 }
+  mulh:   { base_nj: 2.30, switching_nj: 0.40, class: alu_mul, pipeline_stage: EX, latency_cycles: 3 }
+  mulhu:  { base_nj: 2.25, switching_nj: 0.38, class: alu_mul, pipeline_stage: EX, latency_cycles: 3 }
+  div:    { base_nj: 5.80, switching_nj: 0.90, class: alu_div, pipeline_stage: EX, latency_cycles: 32 }
+  divu:   { base_nj: 5.60, switching_nj: 0.85, class: alu_div, pipeline_stage: EX, latency_cycles: 32 }
+  rem:    { base_nj: 5.90, switching_nj: 0.92, class: alu_div, pipeline_stage: EX, latency_cycles: 32 }
+  remu:   { base_nj: 5.70, switching_nj: 0.88, class: alu_div, pipeline_stage: EX, latency_cycles: 32 }
+
+# ---- Memory ----
+# Memory energies split into hit vs miss-likely; the pass estimates which.
+  lw:    { base_nj: 1.80, switching_nj: 0.30, memory_bonus_miss: 14.0, class: mem_load,  pipeline_stage: MEM }
+  lh:    { base_nj: 1.70, switching_nj: 0.28, memory_bonus_miss: 14.0, class: mem_load,  pipeline_stage: MEM }
+  lhu:   { base_nj: 1.70, switching_nj: 0.28, memory_bonus_miss: 14.0, class: mem_load,  pipeline_stage: MEM }
+  lb:    { base_nj: 1.65, switching_nj: 0.27, memory_bonus_miss: 14.0, class: mem_load,  pipeline_stage: MEM }
+  lbu:   { base_nj: 1.65, switching_nj: 0.27, memory_bonus_miss: 14.0, class: mem_load,  pipeline_stage: MEM }
+  sw:    { base_nj: 2.00, switching_nj: 0.35, memory_bonus_miss: 16.0, class: mem_store, pipeline_stage: MEM }
+  sh:    { base_nj: 1.90, switching_nj: 0.32, memory_bonus_miss: 16.0, class: mem_store, pipeline_stage: MEM }
+  sb:    { base_nj: 1.85, switching_nj: 0.30, memory_bonus_miss: 16.0, class: mem_store, pipeline_stage: MEM }
+
+# ---- Control flow ----
+  beq:   { base_nj: 0.55, switching_nj: 0.10, misprediction_bonus_nj: 3.5, class: branch, pipeline_stage: EX }
+  bne:   { base_nj: 0.55, switching_nj: 0.10, misprediction_bonus_nj: 3.5, class: branch, pipeline_stage: EX }
+  blt:   { base_nj: 0.57, switching_nj: 0.11, misprediction_bonus_nj: 3.5, class: branch, pipeline_stage: EX }
+  bge:   { base_nj: 0.57, switching_nj: 0.11, misprediction_bonus_nj: 3.5, class: branch, pipeline_stage: EX }
+  bltu:  { base_nj: 0.56, switching_nj: 0.10, misprediction_bonus_nj: 3.5, class: branch, pipeline_stage: EX }
+  bgeu:  { base_nj: 0.56, switching_nj: 0.10, misprediction_bonus_nj: 3.5, class: branch, pipeline_stage: EX }
+  jal:   { base_nj: 0.48, switching_nj: 0.08, class: branch, pipeline_stage: EX }
+  jalr:  { base_nj: 0.52, switching_nj: 0.09, class: branch, pipeline_stage: EX }
+
+# ---- System / misc (approximate) ----
+  ecall: { base_nj: 1.20, switching_nj: 0.20, class: system, pipeline_stage: EX }
+  fence: { base_nj: 1.80, switching_nj: 0.20, class: system, pipeline_stage: EX }
+
+# ---- IR-level fallbacks (for LLVM IR ops that don't map 1:1) ----
+ir_fallback:
+  default_alu_nj: 0.42
+  default_mem_nj: 1.85
+  default_branch_nj: 0.55
+  default_call_overhead_nj: 2.50   # call setup + return
+
+# ---- Switching activity model ----
+# Multiplier applied to `switching_nj` based on estimated hamming distance
+# of operands between successive uses. Static estimation uses profile-like
+# heuristics (constants, loop induction, phi nodes, etc.).
+switching_profile:
+  constant_operand: 0.3      # constant ops have predictable toggling
+  loop_induction:   0.6      # IV bits mostly stable
+  phi_node:         1.2      # often switches paths
+  unknown:          1.0

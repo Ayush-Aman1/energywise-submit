@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.o
+*.so
+*.dylib
+src/build/
+reports/*.json
+energy_report.json
+.venv/
+venv/
+node_modules/
+.DS_Store
+*.swp
+*.swo
+*~
