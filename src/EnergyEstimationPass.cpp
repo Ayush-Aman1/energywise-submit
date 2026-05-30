@@ -36,9 +36,6 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/Analysis/BranchProbabilityInfo.h"
-#include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/FileSystem.h"
@@ -264,30 +261,6 @@ static double memoryMissProbability(const Instruction &I) {
 }
 
 // -----------------------------------------------------------------------------
-// Trip count estimator:
-//   Try ScalarEvolution; otherwise use branch_weights metadata; otherwise
-//   fall back to DefaultLoopTrip.
-// -----------------------------------------------------------------------------
-static uint64_t estimateTripCount(const Loop *L, ScalarEvolution &SE) {
-  if (!L) return 1;
-  if (auto BTC = SE.getSmallConstantTripCount(L); BTC > 0) return BTC;
-  // Try branch_weights on the latch terminator
-  if (auto *Latch = L->getLoopLatch()) {
-    if (auto *TI = Latch->getTerminator()) {
-      if (auto *MD = TI->getMetadata(LLVMContext::MD_prof)) {
-        if (MD->getNumOperands() >= 3) {
-          // branch_weights: [!"branch_weights", w_true, w_false]
-          // heuristic: trip ≈ max(w_true, w_false) / min(w_true, w_false) + 1
-          // (very rough, but better than nothing)
-          return std::max<uint64_t>(DefaultLoopTrip, 8);
-        }
-      }
-    }
-  }
-  return DefaultLoopTrip;
-}
-
-// -----------------------------------------------------------------------------
 // The pass itself
 // -----------------------------------------------------------------------------
 struct FunctionEnergyRecord {
@@ -307,15 +280,12 @@ public:
              << EnergyModelPath << ", using defaults.\n";
     }
 
-    FunctionAnalysisManager &FAM =
-        MAM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
-
     json::Array functionsJson;
     double moduleTotal = 0.0;
 
     for (Function &F : M) {
       if (F.isDeclaration()) continue;
-      auto rec = analyzeFunction(F, FAM);
+      auto rec = analyzeFunction(F);
       moduleTotal += rec.totalEnergyNj;
 
       json::Object fobj;
@@ -351,22 +321,16 @@ public:
 private:
   EnergyModel model;
 
-  FunctionEnergyRecord analyzeFunction(Function &F, FunctionAnalysisManager &FAM) {
+FunctionEnergyRecord analyzeFunction(Function &F) {
     FunctionEnergyRecord rec;
     rec.name = F.getName().str();
-
-    LoopInfo &LI = FAM.getResult<LoopAnalysis>(F);
-    ScalarEvolution &SE = FAM.getResult<ScalarEvolutionAnalysis>(F);
-    // BranchProbabilityInfo &BPI = FAM.getResult<BranchProbabilityAnalysis>(F);
 
     for (BasicBlock &BB : F) {
       double blockEnergy = 0.0;
       uint64_t blockDyn = 0;
 
-      // Loop-trip multiplier: product of enclosing-loop trip counts.
       uint64_t tripMult = 1;
-      for (Loop *L = LI.getLoopFor(&BB); L; L = L->getParentLoop())
-        tripMult *= estimateTripCount(L, SE);
+      tripMult = DefaultLoopTrip;
       if (tripMult == 0) tripMult = 1;
 
       for (Instruction &I : BB) {

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13.4)
-project(EnergyWise LANGUAGES CXX)
+project(EnergyWise LANGUAGES C CXX)
 
 # -----------------------------------------------------------------------------
 # Build as an LLVM out-of-tree plugin (new pass manager).
@@ -22,12 +22,9 @@ if(DEFINED LT_LLVM_INSTALL_DIR)
   list(APPEND CMAKE_PREFIX_PATH "${LT_LLVM_INSTALL_DIR}/lib/cmake/llvm/")
 endif()
 
-find_package(LLVM 15 CONFIG)
+find_package(LLVM CONFIG)
 if(NOT LLVM_FOUND)
-  find_package(LLVM 16 CONFIG)
-endif()
-if(NOT LLVM_FOUND)
-  find_package(LLVM 17 CONFIG REQUIRED)
+  message(FATAL_ERROR "LLVM not found. Install LLVM or set -DLT_LLVM_INSTALL_DIR=<path>")
 endif()
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")

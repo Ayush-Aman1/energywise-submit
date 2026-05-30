@@ -16,7 +16,7 @@ Two modes:
 """
 
 from __future__ import annotations
-import argparse, json, os, re, subprocess, sys
+import argparse, json, os, re, shutil, subprocess, sys
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Dict, List, Optional
@@ -67,16 +67,28 @@ class EnergyModel:
 # -----------------------------------------------------------------------------
 # Native mode: thin shell around opt
 # -----------------------------------------------------------------------------
+def _find_tool(name: str) -> str:
+    for candidate in [
+        name,
+        f"/opt/homebrew/opt/llvm/bin/{name}",
+        f"/usr/local/opt/llvm/bin/{name}",
+    ]:
+        if Path(candidate).is_file() or shutil.which(candidate):
+            return candidate
+    return name
+
+
 def run_native(src: Path, model: Path, out_report: Path, plugin: Path) -> dict:
     ll = src.with_suffix(".ll")
-    # Emit IR for RV32IMC.
+    clang = _find_tool("clang")
+    opt = _find_tool("opt")
     subprocess.check_call([
-        "clang", "--target=riscv32-unknown-elf",
+        clang, "--target=riscv32-unknown-elf",
         "-march=rv32imc", "-S", "-emit-llvm",
         "-O1", "-o", str(ll), str(src)
     ])
     subprocess.check_call([
-        "opt", f"-load-pass-plugin={plugin}",
+        opt, f"-load-pass-plugin={plugin}",
         "-passes=energywise",
         f"-energy-model={model}",
         f"-energy-report={out_report}",
