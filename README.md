@@ -9,7 +9,8 @@ EnergyWise is an LLVM compiler pass that statically estimates the electrical ene
 ### Prerequisites
 
 - Python 3.8+ with `pyyaml`
-- (Optional) LLVM 15/16/17 development headers for native mode
+- (Optional) LLVM 15–20 development headers for native mode
+- (Windows) CMake + Visual Studio Build Tools for LLVM plugin
 
 ```bash
 pip3 install pyyaml
@@ -25,18 +26,24 @@ python3 src/energywise.py testcases/matmul.c
 
 ### Run All Benchmarks
 
+**Linux / macOS:**
 ```bash
-./scripts/run.sh
+./run.sh
+```
+
+**Windows:**
+```cmd
+run.bat
 ```
 
 ### Build the LLVM Plugin (Optional, for Native Mode)
 
+**Linux / macOS:**
 ```bash
-./scripts/build.sh
+./build.sh
 ```
 
 Or manually:
-
 ```bash
 cd src
 mkdir -p build && cd build
@@ -44,6 +51,21 @@ cmake -DLT_LLVM_INSTALL_DIR=$(llvm-config --prefix) ..
 make -j$(nproc)
 cd ../..
 python3 src/energywise.py --mode native testcases/matmul.c
+```
+
+**Windows (Visual Studio):**
+```cmd
+build.bat
+```
+
+Or manually:
+```cmd
+cd src
+mkdir build && cd build
+cmake -DLT_LLVM_INSTALL_DIR=C:\LLVM -G "Visual Studio 17 2022" ..
+cmake --build . --config Release
+cd ..\..
+python src\energywise.py --mode native testcases\matmul.c
 ```
 
 ### Run with the LLVM Plugin

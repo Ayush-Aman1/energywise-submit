@@ -380,7 +380,13 @@ FunctionEnergyRecord analyzeFunction(Function &F) {
 // -----------------------------------------------------------------------------
 // Plugin registration (new pass manager)
 // -----------------------------------------------------------------------------
-extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
+extern "C" {
+#if defined(_WIN32) || defined(__CYGWIN__)
+  __declspec(dllexport)
+#else
+  LLVM_ATTRIBUTE_WEAK
+#endif
+PassPluginLibraryInfo llvmGetPassPluginInfo() {
   return {
     LLVM_PLUGIN_API_VERSION, "EnergyWise", LLVM_VERSION_STRING,
     [](PassBuilder &PB) {
@@ -395,4 +401,5 @@ extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
         });
     }
   };
+}
 }

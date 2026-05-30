@@ -3,12 +3,19 @@ project(EnergyWise LANGUAGES C CXX)
 
 # -----------------------------------------------------------------------------
 # Build as an LLVM out-of-tree plugin (new pass manager).
-# Usage:
+#
+# Linux / macOS:
 #   mkdir build && cd build
 #   cmake -DLT_LLVM_INSTALL_DIR=$(llvm-config --prefix) ..
 #   make
+#
+# Windows (MSVC):
+#   mkdir build && cd build
+#   cmake -DLT_LLVM_INSTALL_DIR=C:\LLVM -G "Visual Studio 17 2022" ..
+#   cmake --build . --config Release
+#
 # Then:
-#   opt -load-pass-plugin ./libEnergyWise.so -passes=energywise \
+#   opt -load-pass-plugin ./libEnergyWise.{so,dylib,dll} -passes=energywise \
 #       -energy-model=../../models/rv32imc_energy.yaml \
 #       -energy-report=../../reports/report.json bench.ll
 # -----------------------------------------------------------------------------
@@ -36,12 +43,26 @@ add_definitions(${LLVM_DEFINITIONS_LIST})
 
 # Match LLVM build flags (RTTI/exceptions). LLVM is typically built -fno-rtti.
 if(NOT LLVM_ENABLE_RTTI)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
+  if(MSVC)
+    # MSVC: disable RTTI via /GR-
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /GR-")
+  else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
+  endif()
 endif()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility-inlines-hidden")
+
+if(NOT MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility-inlines-hidden")
+endif()
 
 add_library(EnergyWise SHARED EnergyEstimationPass.cpp)
 target_link_libraries(EnergyWise PRIVATE LLVMCore LLVMSupport LLVMAnalysis LLVMPasses)
 
-# Don't prefix "lib" on macOS/Linux to match LLVM convention for plugins.
-set_target_properties(EnergyWise PROPERTIES PREFIX "lib")
+# Plugin naming: "lib" prefix on all platforms (LLVM convention), no "lib" prefix on Windows DLLs
+if(MSVC)
+  set_target_properties(EnergyWise PROPERTIES
+    PREFIX ""
+    SUFFIX ".dll")
+else()
+  set_target_properties(EnergyWise PROPERTIES PREFIX "lib")
+endif()

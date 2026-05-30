@@ -71,16 +71,27 @@ def _find_tool(name: str) -> str:
     candidates = [name]
     if shutil.which(name):
         return name
-    for prefix in ["/opt/homebrew/opt/llvm/bin",
-                   "/usr/local/opt/llvm/bin"]:
+    homebrew_paths = ["/opt/homebrew/opt/llvm/bin",
+                      "/usr/local/opt/llvm/bin"]
+    for prefix in homebrew_paths:
         p = Path(prefix) / name
         if p.is_file():
             return str(p)
-    import glob
-    for d in sorted(glob.glob("/usr/lib/llvm-*/bin")):
+    import glob as globmod
+    for d in sorted(globmod.glob("/usr/lib/llvm-*/bin")):
         p = Path(d) / name
         if p.is_file():
             return str(p)
+    if sys.platform == "win32":
+        for env_dir in os.environ.get("PATH", "").split(";"):
+            p = Path(env_dir) / f"{name}.exe"
+            if p.is_file():
+                return str(p)
+        for check in [r"C:\Program Files\LLVM\bin",
+                      r"C:\LLVM\bin"]:
+            p = Path(check) / f"{name}.exe"
+            if p.is_file():
+                return str(p)
     return name
 
 
