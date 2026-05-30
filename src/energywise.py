@@ -68,13 +68,19 @@ class EnergyModel:
 # Native mode: thin shell around opt
 # -----------------------------------------------------------------------------
 def _find_tool(name: str) -> str:
-    for candidate in [
-        name,
-        f"/opt/homebrew/opt/llvm/bin/{name}",
-        f"/usr/local/opt/llvm/bin/{name}",
-    ]:
-        if Path(candidate).is_file() or shutil.which(candidate):
-            return candidate
+    candidates = [name]
+    if shutil.which(name):
+        return name
+    for prefix in ["/opt/homebrew/opt/llvm/bin",
+                   "/usr/local/opt/llvm/bin"]:
+        p = Path(prefix) / name
+        if p.is_file():
+            return str(p)
+    import glob
+    for d in sorted(glob.glob("/usr/lib/llvm-*/bin")):
+        p = Path(d) / name
+        if p.is_file():
+            return str(p)
     return name
 
 

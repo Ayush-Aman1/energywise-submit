@@ -21,10 +21,33 @@ fi
 
 echo "Python simulator: OK"
 
-LLVM_OK=false
-if command -v llvm-config &>/dev/null; then
-    LLVM_VERSION=$(llvm-config --version 2>/dev/null | head -c3)
-    echo "Found LLVM $LLVM_VERSION"
+find_llvm_config() {
+    if command -v llvm-config &>/dev/null; then
+        llvm-config --prefix
+        return 0
+    fi
+    for path in \
+        /opt/homebrew/opt/llvm/bin/llvm-config \
+        /usr/local/opt/llvm/bin/llvm-config \
+        /usr/lib/llvm/bin/llvm-config; do
+        if [ -x "$path" ]; then
+            "$path" --prefix
+            return 0
+        fi
+    done
+    for ver in 20 19 18 17 16 15 14; do
+        if [ -x "/usr/lib/llvm-$ver/bin/llvm-config" ]; then
+            "/usr/lib/llvm-$ver/bin/llvm-config" --prefix
+            return 0
+        fi
+    done
+    return 1
+}
+
+LLVM_PREFIX=""
+if LLVM_PREFIX=$(find_llvm_config); then
+    LLVM_VERSION="$("$LLVM_PREFIX/bin/llvm-config" --version 2>/dev/null || echo "unknown")"
+    echo "Found LLVM $LLVM_VERSION at $LLVM_PREFIX"
 
     BUILD_DIR="$ROOT/src/build"
     if [ ! -d "$BUILD_DIR" ]; then
@@ -32,48 +55,28 @@ if command -v llvm-config &>/dev/null; then
     fi
 
     cd "$BUILD_DIR"
-    cmake -DLT_LLVM_INSTALL_DIR="$(llvm-config --prefix)" .. 2>&1 | tail -5
+    cmake -DLT_LLVM_INSTALL_DIR="$LLVM_PREFIX" .. 2>&1 | tail -5
     make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)" 2>&1 | tail -5
 
     if [ -f "$BUILD_DIR/libEnergyWise.so" ] || [ -f "$BUILD_DIR/libEnergyWise.dylib" ]; then
         echo "LLVM pass plugin: OK"
         LLVM_OK=true
     else
-        echo "LLVM pass plugin: build attempted but library not found"
-        echo "The Python simulator will still work fully."
+        echo ""
+        echo "*** Plugin build did not produce libEnergyWise.so / .dylib"
+        echo "*** Possible causes: LLVM version mismatch or missing development headers."
+        echo "*** The Python simulator still works — re-run with --mode sim."
+        LLVM_OK=false
     fi
 else
-    echo "llvm-config not found in PATH."
     echo ""
-    echo "Trying Homebrew LLVM..."
-    HOMEBREW_LLVM="/opt/homebrew/opt/llvm/bin/llvm-config"
-    if [ -x "$HOMEBREW_LLVM" ]; then
-        echo "Found Homebrew LLVM at $HOMEBREW_LLVM"
-        LLVM_PREFIX=$("$HOMEBREW_LLVM" --prefix)
-
-        BUILD_DIR="$ROOT/src/build"
-        if [ ! -d "$BUILD_DIR" ]; then
-            mkdir -p "$BUILD_DIR"
-        fi
-
-        cd "$BUILD_DIR"
-        cmake -DLT_LLVM_INSTALL_DIR="$LLVM_PREFIX" .. 2>&1 | tail -5
-        make -j"$(sysctl -n hw.ncpu 2>/dev/null || echo 2)" 2>&1 | tail -5
-
-        if [ -f "$BUILD_DIR/libEnergyWise.so" ] || [ -f "$BUILD_DIR/libEnergyWise.dylib" ]; then
-            echo "LLVM pass plugin: OK"
-            LLVM_OK=true
-        else
-            echo "LLVM pass plugin: build attempted but library not found"
-            echo "The Python simulator will still work fully."
-        fi
-    else
-        echo "No LLVM installation found."
-        echo "The Python simulator mode works without LLVM."
-        echo "For native mode, install LLVM 15/16/17/20 development headers."
-        echo "  macOS:  brew install llvm"
-        echo "  Ubuntu: apt install llvm-dev"
-    fi
+    echo "LLVM not found. The Python simulator mode works without LLVM."
+    echo ""
+    echo "To enable native (LLVM pass) mode, install LLVM + Clang development headers:"
+    echo "  macOS:  brew install llvm"
+    echo "  Ubuntu: sudo apt install llvm-dev clang"
+    echo "  Fedora: sudo dnf install llvm-devel clang"
+    LLVM_OK=false
 fi
 
 echo ""

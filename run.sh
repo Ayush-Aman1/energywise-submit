@@ -9,20 +9,48 @@ echo ""
 
 mkdir -p reports
 
-PASS=false
-if [ -f "$ROOT/src/build/libEnergyWise.so" ] || [ -f "$ROOT/src/build/libEnergyWise.dylib" ]; then
-    PASS=true
-fi
+find_plugin() {
+    if [ -f "$ROOT/src/build/libEnergyWise.so" ]; then
+        echo "$ROOT/src/build/libEnergyWise.so"
+    elif [ -f "$ROOT/src/build/libEnergyWise.dylib" ]; then
+        echo "$ROOT/src/build/libEnergyWise.dylib"
+    fi
+}
+
+PLUGIN=$(find_plugin)
 
 choose_mode() {
-    if [ "$PASS" = true ] && command -v opt &>/dev/null; then
-        echo "native"
+    if [ -n "$PLUGIN" ]; then
+        if command -v opt &>/dev/null; then
+            echo "native"
+        elif [ -x /opt/homebrew/opt/llvm/bin/opt ]; then
+            echo "native_homebrew"
+        else
+            echo "sim"
+        fi
     else
         echo "sim"
     fi
 }
 
-MODE=$(choose_mode)
+MODE="${1:-sim}"
+if [ "$1" = "--mode" ] && [ -n "$2" ]; then
+    MODE="$2"
+    shift 2
+elif [ "$MODE" != "sim" ] && [ "$MODE" != "native" ]; then
+    PLUGIN=$(find_plugin)
+    if [ -n "$PLUGIN" ]; then
+        if command -v opt &>/dev/null; then
+            MODE="native"
+        elif [ -x /opt/homebrew/opt/llvm/bin/opt ]; then
+            MODE="native"
+        else
+            MODE="sim"
+        fi
+    else
+        MODE="sim"
+    fi
+fi
 echo "Mode: $MODE"
 echo ""
 
@@ -32,8 +60,10 @@ for tc in testcases/*.c; do
     echo "--- $tc ---"
     if [ "$MODE" = "native" ]; then
         python3 "$ROOT/src/energywise.py" "$tc" --mode native \
-            --plugin "$ROOT/src/build/libEnergyWise.so" \
-            --report "$report" --pretty
+            --plugin "$PLUGIN" --report "$report" --pretty
+    elif [ "$MODE" = "native_homebrew" ]; then
+        python3 "$ROOT/src/energywise.py" "$tc" --mode native \
+            --plugin "$PLUGIN" --report "$report" --pretty
     else
         python3 "$ROOT/src/energywise.py" "$tc" --mode sim \
             --report "$report" --pretty
