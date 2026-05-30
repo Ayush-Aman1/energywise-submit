@@ -4,9 +4,7 @@
 
 EnergyWise is an LLVM compiler pass that statically estimates the electrical energy consumption (in nanojoules) of C/C++ programs targeting a RISC-V rv32imc core — without executing the program on real hardware. It ranks functions and basic blocks by their energy contribution, enabling developers to identify where energy is spent and which transformations reduce it.
 
-## Quick Start
-
-### Prerequisites
+## Prerequisites
 
 - Python 3.8+ with `pyyaml`
 - (Optional) LLVM 15–20 development headers for native mode
@@ -21,9 +19,13 @@ On macOS/Linux, make the scripts executable:
 chmod +x build.sh run.sh
 ```
 
-### Run the Simulator
+---
 
-The Python simulator parses C source and estimates energy without LLVM:
+## Mode 1: Terminal Only
+
+Use this mode for automated evaluation, CI, or headless environments.
+
+### Run a Single Benchmark
 
 ```bash
 python3 src/energywise.py testcases/matmul.c
@@ -41,7 +43,9 @@ python3 src/energywise.py testcases/matmul.c
 run.bat
 ```
 
-### Build the LLVM Plugin (Optional, for Native Mode)
+### Build the LLVM Plugin (Optional)
+
+The Python simulator runs without LLVM. For native mode (higher-fidelity IR-level analysis), build the plugin:
 
 **Linux / macOS:**
 ```bash
@@ -73,22 +77,72 @@ cd ..\..
 python src\energywise.py --mode native testcases\matmul.c
 ```
 
-### Run with the LLVM Plugin (Manual)
-
-The Python driver (`--mode native`) handles `clang` and `opt` path detection automatically. To run the pass manually:
+### Run the LLVM Plugin Directly
 
 ```bash
 # Step 1: Compile C to LLVM IR
 clang --target=riscv32-unknown-elf -march=rv32imc -S -emit-llvm -O1 \
     -o testcases/matmul.ll testcases/matmul.c
 
-# Step 2: Run the energy pass (use .so on Linux, .dylib on macOS, .dll on Windows)
+# Step 2: Run the energy pass
+#         (use .so on Linux, .dylib on macOS, .dll on Windows)
 opt -load-pass-plugin src/build/libEnergyWise.so \
     -passes=energywise \
     -energy-model=models/rv32imc_energy.yaml \
     -energy-report=reports/matmul.json \
     -disable-output testcases/matmul.ll
 ```
+
+### Command-Line Options
+
+```
+python3 src/energywise.py <source.c> [options]
+
+  --mode sim|native       sim = Python simulator (default), native = LLVM pass
+  --model <path>          Path to energy model YAML (default: models/rv32imc_energy.yaml)
+  --report <path>         Output JSON report path (default: reports/<name>.json)
+  --plugin <path>         Path to LLVM plugin (.so/.dylib/.dll) (native mode)
+  --default-trip <N>      Fallback loop trip count (default: 32)
+  --pretty                 Pretty-print JSON output
+```
+
+---
+
+## Mode 2: Terminal + Web Dashboard
+
+The web dashboard provides an interactive UI with animated pipeline visualization, per-function breakdowns, and upload support for custom C files.
+
+### Start the Dashboard
+
+```bash
+python3 webui/server.py
+```
+
+Open **http://localhost:8080** in a browser. The dashboard provides:
+
+- **Benchmark tabs** — switch between all 5 test cases with pre-loaded results
+- **Upload tab (+Upload)** — drop a `.c` file or paste source code, then click **Analyze**
+- **RUN ANALYSIS** — replays the animated pipeline + terminal for the current view
+- **DEMO MODE** — auto-cycles through all benchmarks with title cards and a summary
+
+You can also specify a custom port:
+```bash
+python3 webui/server.py 3000    # http://localhost:3000
+```
+
+### How It Works
+
+The dashboard server (`webui/server.py`) serves the HTML UI and exposes two API endpoints:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/benchmarks` | GET | Lists all built-in test cases with source code |
+| `/api/benchmark/<name>` | GET | Runs the simulator on a built-in test case |
+| `/api/analyze` | POST | Accepts `{ "source": "...", "filename": "..." }`, runs the simulator, returns JSON |
+
+The server invokes `src/energywise.py --mode sim` under the hood, so no LLVM installation is needed for the dashboard.
+
+---
 
 ## Project Structure
 
@@ -114,6 +168,9 @@ opt -load-pass-plugin src/build/libEnergyWise.so \
 │   ├── scale.c                    Brightness scaler: division vs shift
 │   ├── sort.c                     Sorting: bubble vs selection
 │   └── dotprod.c                  IIR filter: per-sample vs local-cached
+├── webui/
+│   ├── index.html                 Interactive dashboard (standalone HTML)
+│   └── server.py                  Backend server (POST /api/analyze)
 └── reports/                        Generated JSON reports (output)
 ```
 
@@ -146,19 +203,6 @@ Each run produces a JSON report:
     }
   ]
 }
-```
-
-## Command-Line Options
-
-```
-python3 src/energywise.py <source.c> [options]
-
-  --mode sim|native       sim = Python simulator (default), native = LLVM pass
-  --model <path>          Path to energy model YAML (default: models/rv32imc_energy.yaml)
-  --report <path>         Output JSON report path (default: reports/<name>.json)
-  --plugin <path>         Path to LLVM plugin (.so/.dylib/.dll) (native mode)
-  --default-trip <N>      Fallback loop trip count (default: 32)
-  --pretty                 Pretty-print JSON output
 ```
 
 ## Verified Results

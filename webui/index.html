@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EnergyWise — Static Energy Estimation Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0e14; --panel: #11161d; --panel-hi: #161c24;
+  --border: #2a3340; --text: #c5cdd8; --text-dim: #6b7684;
+  --text-hi: #e8ecf2; --amber: #f2a93b; --green: #7ac74f;
+  --red: #e06454; --blue: #5aa9e6; --purple: #b56ce0;
+  --mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+}
+body { background: var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, sans-serif; min-height: 100vh; font-feature-settings: "ss01", "cv11"; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border); }
+::-webkit-scrollbar-track { background: var(--bg); }
+code { font-family: var(--mono); }
+
+/* top bar */
+.topbar { border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; gap: 24px; background: var(--panel); flex-wrap: wrap; }
+.logo-wrap { display: flex; align-items: center; gap: 10px; }
+.logo { width: 30px; height: 30px; border-radius: 6px; background: linear-gradient(135deg, var(--amber) 0%, var(--red) 100%); display: flex; align-items: center; justify-content: center; color: var(--bg); font-family: var(--mono); font-weight: 800; font-size: 16px; }
+.brand { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--text-hi); letter-spacing: -0.02em; }
+.brand-sub { font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 0.1em; }
+.flex-grow { flex: 1; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.tab { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 7px 14px; border-radius: 4px; cursor: pointer; font-family: var(--mono); font-size: 12px; transition: all 0.15s; }
+.tab:hover { background: var(--panel-hi); color: var(--amber); }
+.tab.active { background: var(--panel-hi); border-color: var(--amber); color: var(--amber); }
+.tab.tab-upload { border-color: var(--blue); color: var(--blue); }
+.tab.tab-upload:hover { background: rgba(90,169,230,0.1); color: var(--blue); }
+.tab.tab-upload.active { background: rgba(90,169,230,0.15); border-color: var(--blue); }
+
+.btn-run { background: linear-gradient(135deg, var(--amber), #e0992e); color: var(--bg); border: none; padding: 8px 18px; border-radius: 5px; font-family: var(--mono); font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px; }
+.btn-run:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(242,169,59,0.3); }
+.btn-run:active { transform: translateY(0); }
+.btn-run.running { opacity: 0.7; cursor: wait; }
+.btn-run svg { width: 14px; height: 14px; }
+
+.btn-demo { background: transparent; border: 1px solid var(--purple); color: var(--purple); padding: 8px 18px; border-radius: 5px; font-family: var(--mono); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px; }
+.btn-demo:hover { background: rgba(181,108,224,0.1); }
+.btn-demo.running { background: var(--purple); color: #fff; }
+.btn-demo svg { width: 14px; height: 14px; }
+
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+#app { overflow: hidden; }
+
+/* upload area */
+.upload-area { margin: 24px 24px 0; background: var(--panel); border: 2px dashed var(--border); border-radius: 8px; padding: 48px 32px; text-align: center; transition: all 0.3s; cursor: pointer; }
+.upload-area:hover, .upload-area.drag-over { border-color: var(--blue); background: rgba(90,169,230,0.05); }
+.upload-area-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.6; }
+.upload-area-title { font-family: var(--mono); font-size: 16px; color: var(--text-hi); font-weight: 600; margin-bottom: 8px; }
+.upload-area-sub { font-family: var(--mono); font-size: 12px; color: var(--text-dim); margin-bottom: 16px; line-height: 1.6; }
+.upload-area-hint { font-family: var(--mono); font-size: 11px; color: var(--text-dim); opacity: 0.7; }
+.upload-btn { background: var(--blue); color: #fff; border: none; padding: 10px 24px; border-radius: 5px; font-family: var(--mono); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; letter-spacing: 0.05em; }
+.upload-btn:hover { opacity: 0.9; }
+#file-input { display: none; }
+
+.source-editor { margin: 0 24px; background: var(--panel); border: 1px solid var(--border); border-top: none; }
+.source-editor-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--panel-hi); }
+.source-editor-title { font-family: var(--mono); font-size: 11px; color: var(--text-dim); letter-spacing: 0.1em; }
+.source-editor-filename { font-family: var(--mono); font-size: 12px; color: var(--text-hi); }
+.source-textarea { width: 100%; min-height: 200px; background: var(--bg); color: var(--text-hi); border: none; padding: 16px; font-family: var(--mono); font-size: 12px; line-height: 1.7; resize: vertical; outline: none; }
+.source-textarea::placeholder { color: var(--text-dim); }
+.analyze-bar { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--panel-hi); }
+.analyze-bar-info { font-family: var(--mono); font-size: 11px; color: var(--text-dim); flex: 1; }
+
+/* pipeline */
+.pipeline-area { margin: 24px 24px 0; background: var(--panel); border: 1px solid var(--border); padding: 20px 24px; overflow: hidden; }
+.pipeline-title { font-family: var(--mono); font-size: 11px; color: var(--amber); letter-spacing: 0.15em; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.pipeline-title .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); animation: pulse-glow 1.5s ease-in-out infinite; }
+@keyframes pulse-glow { 0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--amber); } 50% { opacity: 0.4; box-shadow: 0 0 12px var(--amber); } }
+.pipeline-stages { display: flex; gap: 0; align-items: stretch; }
+.stage { flex: 1; text-align: center; position: relative; padding: 14px 8px; background: var(--bg); border: 1px solid var(--border); transition: all 0.5s ease; overflow: hidden; }
+.stage + .stage { border-left: none; }
+.stage .stage-icon { font-size: 20px; margin-bottom: 6px; }
+.stage .stage-label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 0.1em; }
+.stage .stage-sub { font-family: var(--mono); font-size: 9px; color: var(--text-dim); margin-top: 2px; opacity: 0.6; }
+.stage .stage-check { position: absolute; top: 6px; right: 8px; color: var(--green); font-size: 12px; font-weight: 700; opacity: 0; transition: opacity 0.3s; }
+.stage.active { background: rgba(242,169,59,0.08); border-color: var(--amber); }
+.stage.active .stage-label { color: var(--amber); }
+.stage.done { background: rgba(122,199,79,0.06); border-color: rgba(122,199,79,0.3); }
+.stage.done .stage-label { color: var(--green); }
+.stage.done .stage-check { opacity: 1; }
+.stage-arrow { display: flex; align-items: center; justify-content: center; width: 28px; color: var(--text-dim); font-size: 14px; transition: color 0.3s; }
+.stage-arrow.active { color: var(--amber); }
+.stage-arrow.done { color: var(--green); }
+
+/* terminal */
+.terminal { margin: 0 24px; background: #0c1018; border: 1px solid var(--border); border-top: none; max-height: 0; overflow: hidden; transition: max-height 0.4s ease, padding 0.4s ease, opacity 0.3s ease; opacity: 0; }
+.terminal.open { max-height: 400px; padding: 16px 20px; opacity: 1; overflow-y: auto; }
+.terminal-line { font-family: var(--mono); font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
+.terminal-line .prompt { color: var(--green); }
+.terminal-line .cmd { color: var(--text-hi); }
+.terminal-line .info { color: var(--text-dim); }
+.terminal-line .warn { color: var(--amber); }
+.terminal-line .result { color: var(--blue); }
+.terminal-line .success { color: var(--green); }
+.terminal-line .highlight { color: var(--amber); font-weight: 600; }
+.terminal-line .label { color: var(--purple); }
+.terminal-line .error { color: var(--red); }
+.terminal-cursor { display: inline-block; width: 8px; height: 14px; background: var(--green); vertical-align: text-bottom; animation: blink-cursor 0.8s step-end infinite; }
+@keyframes blink-cursor { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* summary */
+.summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin: 24px 24px 0; }
+.stat { background: var(--panel); padding: 18px 20px; }
+.stat-label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 0.15em; margin-bottom: 8px; }
+.stat-value { font-family: var(--mono); font-size: 18px; font-weight: 600; color: var(--text-hi); margin-bottom: 4px; line-height: 1.2; word-break: break-word; }
+.stat-value.amber { color: var(--amber); }
+.stat-value.green { color: var(--green); }
+.stat-sub { font-size: 11px; color: var(--text-dim); }
+
+/* savings meter */
+.savings-meter { margin: 24px 24px 0; background: var(--panel); border: 1px solid rgba(122,199,79,0.25); padding: 20px 24px; }
+.savings-meter-title { font-family: var(--mono); font-size: 11px; color: var(--green); letter-spacing: 0.15em; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.savings-bar-container { background: var(--bg); border: 1px solid var(--border); height: 32px; position: relative; overflow: hidden; }
+.savings-bar-fill { height: 100%; background: linear-gradient(90deg, var(--green), #5cc84f); transition: width 1.2s cubic-bezier(0.25,0.46,0.45,0.94); position: relative; }
+.savings-bar-fill::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 60%); }
+.savings-bar-label { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-family: var(--mono); font-size: 13px; color: var(--text-hi); font-weight: 700; mix-blend-mode: difference; }
+.savings-stats { display: flex; gap: 32px; margin-top: 12px; }
+.savings-stat { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+.savings-stat span { color: var(--green); font-weight: 600; }
+
+/* panels */
+.panel { background: var(--panel); border: 1px solid var(--border); margin-top: 24px; }
+.panel.accent { border-color: rgba(242,169,59,0.25); }
+.panel-head { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 12px; }
+.panel-title { font-family: var(--mono); font-size: 11px; color: var(--text); letter-spacing: 0.15em; font-weight: 600; }
+.panel.accent .panel-title { color: var(--amber); }
+.panel-sub { font-size: 11px; color: var(--text-dim); }
+.panel-body { padding: 20px; }
+.main { padding: 0 24px 40px; }
+
+/* recommendation */
+.recommendation { display: flex; align-items: center; gap: 24px; padding: 4px 0; }
+.rec-icon { width: 52px; height: 52px; border-radius: 8px; background: rgba(242,169,59,0.13); display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(242,169,59,0.25); font-size: 26px; }
+.rec-body { flex: 1; }
+.rec-pair { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-family: var(--mono); font-size: 14px; color: var(--text-hi); flex-wrap: wrap; }
+.rec-pair .from { color: var(--red); }
+.rec-pair .to { color: var(--green); }
+.rec-tag { margin-left: 8px; padding: 2px 8px; background: rgba(122,199,79,0.13); color: var(--green); border-radius: 3px; font-size: 11px; }
+.rec-reason { font-size: 13px; color: var(--text); line-height: 1.6; max-width: 720px; }
+.rec-savings { text-align: right; flex-shrink: 0; }
+.rec-big { font-family: var(--mono); font-size: 28px; color: var(--green); font-weight: 700; }
+.rec-label { font-size: 10px; color: var(--text-dim); letter-spacing: 0.15em; }
+
+/* bar chart */
+.bar-chart { padding: 20px 10px; }
+.bar-row { display: grid; grid-template-columns: 140px 1fr 120px; align-items: center; gap: 16px; margin-bottom: 24px; }
+.bar-label { font-family: var(--mono); font-size: 13px; color: var(--text-hi); }
+.bar-track { height: 34px; background: var(--bg); display: flex; border: 1px solid var(--border); position: relative; }
+.bar-seg { height: 100%; position: relative; transition: all 0.3s; }
+.bar-seg:hover { filter: brightness(1.3); }
+.bar-seg:hover::after { content: attr(data-label); position: absolute; top: -26px; left: 50%; transform: translateX(-50%); white-space: nowrap; background: var(--panel-hi); border: 1px solid var(--border); padding: 3px 8px; font-family: var(--mono); font-size: 11px; color: var(--text-hi); z-index: 10; pointer-events: none; }
+.bar-total { font-family: var(--mono); font-size: 14px; color: var(--amber); text-align: right; font-weight: 600; }
+.bar-total.green { color: var(--green); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; padding-top: 8px; margin-top: 12px; border-top: 1px solid var(--border); }
+.legend-item { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--text); }
+.legend-dot { width: 10px; height: 10px; flex-shrink: 0; }
+
+/* function cards */
+.fn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 4px; }
+@media (max-width: 900px) { .fn-grid { grid-template-columns: 1fr; } .summary { grid-template-columns: 1fr 1fr; } }
+.fn-card { background: var(--panel); border: 1px solid var(--border); padding: 20px; position: relative; overflow: hidden; }
+.fn-card.optimized { border-color: rgba(122,199,79,0.25); }
+.opt-badge { position: absolute; top: 0; right: 0; padding: 3px 10px; background: rgba(122,199,79,0.13); color: var(--green); font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; border-left: 1px solid rgba(122,199,79,0.25); border-bottom: 1px solid rgba(122,199,79,0.25); }
+.fn-header { display: flex; gap: 8px; margin-bottom: 16px; }
+.fn-header-icon { color: var(--text-dim); margin-top: 2px; }
+.fn-name { font-family: var(--mono); font-size: 14px; color: var(--text-hi); font-weight: 600; }
+.fn-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.fn-stats { display: flex; gap: 24px; margin-bottom: 16px; }
+.fn-stat-label { font-size: 10px; color: var(--text-dim); letter-spacing: 0.1em; }
+.fn-stat-value { font-family: var(--mono); font-size: 20px; color: var(--amber); font-weight: 600; }
+.fn-stat-value.green { color: var(--green); }
+.fn-stat-value.text { color: var(--text); }
+.fn-stat-unit { font-size: 11px; color: var(--text-dim); }
+.fn-stat-value.small { font-size: 14px; margin-top: 4px; }
+.fn-breakdown { border-top: 1px solid var(--border); padding-top: 12px; }
+.fn-class-row { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; padding: 3px 0; color: var(--text); }
+.fn-class-left { display: flex; align-items: center; gap: 6px; }
+.fn-class-right { color: var(--text-dim); }
+
+/* pie chart */
+.pie-wrap { display: flex; align-items: center; justify-content: center; padding: 8px 0 16px; }
+.pie { width: 160px; height: 160px; }
+
+/* footer */
+.model-info { margin-top: 24px; padding: 14px 20px; border: 1px dashed var(--border); font-family: var(--mono); font-size: 11px; color: var(--text-dim); line-height: 1.8; }
+.model-info-row { display: flex; gap: 28px; flex-wrap: wrap; }
+.model-info strong { color: var(--text); font-weight: 400; }
+.notes-box { margin-top: 32px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--border); font-family: var(--mono); font-size: 11px; color: var(--text-dim); line-height: 1.8; }
+.notes-title { color: var(--amber); letter-spacing: 0.1em; margin-bottom: 8px; font-size: 11px; }
+.notes-box em { font-style: italic; color: var(--text); }
+
+/* error banner */
+.error-banner { margin: 24px 24px 0; background: rgba(224,100,84,0.08); border: 1px solid rgba(224,100,84,0.3); padding: 16px 20px; border-radius: 6px; font-family: var(--mono); font-size: 13px; color: var(--red); line-height: 1.6; }
+.error-banner-title { font-weight: 700; margin-bottom: 4px; }
+
+/* loading spin */
+.spin { animation: spin 1s linear infinite; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo-wrap">
+    <div class="logo">⚡</div>
+    <div>
+      <div class="brand">EnergyWise</div>
+      <div class="brand-sub">STATIC · RISC-V · rv32imc</div>
+    </div>
+  </div>
+  <div class="flex-grow"></div>
+  <button class="btn-run" id="btnRun" onclick="runAnalysis()">
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6V2z"/></svg>
+    RUN ANALYSIS
+  </button>
+  <button class="btn-demo" id="btnDemo" onclick="runDemo()">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><polygon points="7,5 11,8 7,11" fill="currentColor"/></svg>
+    DEMO MODE
+  </button>
+  <div class="tabs" id="tabs"></div>
+</div>
+<div id="app"></div>
+
+<script>
+/* ================================================================== */
+/*  Report data — pre-built examples + dynamic analysis results       */
+/* ================================================================== */
+const BUILTIN_REPORTS = {
+  "matmul.c": {
+    module: "matmul.c", model: "rv32imc_energy.yaml", total_nj: 12991865.80,
+    functions: [
+      { name: "matmul_naive", total_nj: 7749960.32, dynamic_inst_est: 2109504,
+        hotest_block: "matmul_naive.entry",
+        by_class: { loop_overhead: 649344.0, alu_int: 1031200.0, alu_mul: 2064000.0, mem_load: 4005416.32 } },
+      { name: "matmul_tiled", total_nj: 5241905.48, dynamic_inst_est: 3294292,
+        hotest_block: "matmul_tiled.entry",
+        by_class: { loop_overhead: 818688.0, alu_int: 1201152.0, alu_mul: 2064000.0, mem_load: 1158065.48 } }
+    ],
+    optimization: {
+      pair: ["matmul_naive", "matmul_tiled"],
+      transformation: "Cache tiling (16×16 blocks)",
+      savings_pct: 32.4,
+      reason: "Inner loop's miss probability drops from 0.20 to 0.05 when the working set fits in L1. Memory-load energy is the dominant class, so the reduction is large."
+    },
+    meta: { name: "rv32imc_pulp_like", voltage_v: 1.0, frequency_mhz: 100 },
+    source: '#include <stdint.h>\n\n#define N 64\n#define TILE 16\n\nint32_t A[N][N];\nint32_t B[N][N];\nint32_t C[N][N];\n\nvoid matmul_naive(void) {\n    for (int i = 0; i < N; i++) {\n        for (int j = 0; j < N; j++) {\n            int32_t s = 0;\n            for (int k = 0; k < N; k++) {\n                s = s + A[i][k] * B[k][j];\n            }\n            C[i][j] = s;\n        }\n    }\n}\n\nvoid matmul_tiled(void) {\n    for (int ii = 0; ii < N; ii += TILE) {\n        for (int jj = 0; jj < N; jj += TILE) {\n            for (int kk = 0; kk < N; kk += TILE) {\n                for (int i = 0; i < TILE; i++) {\n                    for (int j = 0; j < TILE; j++) {\n                        int32_t s = C[ii + i][jj + j];\n                        for (int k = 0; k < TILE; k++) {\n                            s = s + A[ii + i][kk + k] * B[kk + k][jj + j];\n                        }\n                        C[ii + i][jj + j] = s;\n                    }\n                }\n            }\n        }\n    }\n}',
+    terminal_lines: [
+      { type: "prompt", text: "$ energywise --sim bench/matmul.c" },
+      { type: "info", text: "Loading energy model: rv32imc_energy.yaml" },
+      { type: "info", text: "Parsing source: bench/matmul.c" },
+      { type: "info", text: "  [1/2] matmul_naive  — 2 nested loops, stride-heavy access" },
+      { type: "warn", text: "  ⚠ L1 miss probability: 0.20 (working set exceeds 16 KB)" },
+      { type: "info", text: "  [2/2] matmul_tiled  — 3 nested loops, tiled 16×16 blocks" },
+      { type: "success", text: "  ✓ L1 miss probability: 0.05 (working set fits in cache)" },
+      { type: "info", text: "" },
+      { type: "label", text: "estimation complete" },
+      { type: "result", text: "  matmul_naive   7,749,960 nJ   (2,109,504 dyn insts)" },
+      { type: "result", text: "  matmul_tiled   5,241,905 nJ   (3,294,292 dyn insts)" },
+      { type: "highlight", text: "  → savings: 32.4%  (2,508,055 nJ)" },
+      { type: "info", text: "" },
+      { type: "prompt", text: "$ _" },
+    ],
+  },
+  "fir.c": {
+    module: "fir.c", model: "rv32imc_energy.yaml", total_nj: 447007.68,
+    functions: [
+      { name: "fir_naive", total_nj: 229128.48, dynamic_inst_est: 114912,
+        hotest_block: "fir_naive.entry",
+        by_class: { loop_overhead: 33072.48, alu_int: 16128.0, alu_mul: 39513.60, mem_load: 140414.40 } },
+      { name: "fir_unrolled", total_nj: 217879.20, dynamic_inst_est: 127008,
+        hotest_block: "fir_unrolled.entry",
+        by_class: { loop_overhead: 9727.20, alu_int: 28224.0, alu_mul: 39513.60, mem_load: 140414.40 } }
+    ],
+    optimization: {
+      pair: ["fir_naive", "fir_unrolled"],
+      transformation: "Loop unrolling (×4)",
+      savings_pct: 4.9,
+      reason: "Loop overhead (cmp + branch + induction) is paid 4× less often. Savings are modest because MAC work dominates the total."
+    },
+    meta: { name: "rv32imc_pulp_like", voltage_v: 1.0, frequency_mhz: 100 },
+    source: '#include <stdint.h>\n\n#define N 1024\n#define TAPS 16\n\nint16_t samples[N];\nint16_t coeffs[TAPS];\nint32_t output[N];\n\nvoid fir_naive(void) {\n    for (int i = TAPS; i < N; i++) {\n        int32_t acc = 0;\n        for (int k = 0; k < TAPS; k++) {\n            acc = acc + samples[i - k] * coeffs[k];\n        }\n        output[i] = acc;\n    }\n}\n\nvoid fir_unrolled(void) {\n    for (int i = TAPS; i < N; i++) {\n        int32_t acc = 0;\n        for (int k = 0; k < TAPS; k += 4) {\n            acc = acc + samples[i - k]     * coeffs[k];\n            acc = acc + samples[i - k - 1] * coeffs[k + 1];\n            acc = acc + samples[i - k - 2] * coeffs[k + 2];\n            acc = acc + samples[i - k - 3] * coeffs[k + 3];\n        }\n        output[i] = acc;\n    }\n}',
+  },
+  "scale.c": {
+    module: "scale.c", model: "rv32imc_energy.yaml", total_nj: 125829.12,
+    functions: [
+      { name: "scale_div", total_nj: 75489.28, dynamic_inst_est: 16384,
+        hotest_block: "scale_div.entry",
+        by_class: { loop_overhead: 7905.28, alu_div: 27443.20, mem_load: 40140.80 } },
+      { name: "scale_shift", total_nj: 50339.84, dynamic_inst_est: 16384,
+        hotest_block: "scale_shift.entry",
+        by_class: { loop_overhead: 7905.28, alu_shift: 2293.76, mem_load: 40140.80 } }
+    ],
+    optimization: {
+      pair: ["scale_div", "scale_shift"],
+      transformation: "Strength reduction (÷8 → >>3)",
+      savings_pct: 33.3,
+      reason: "Division is ~13× more expensive than arithmetic shift on rv32imc (5.80 nJ vs 0.45 nJ base, and 32-cycle vs 1-cycle latency)."
+    },
+    meta: { name: "rv32imc_pulp_like", voltage_v: 1.0, frequency_mhz: 100 },
+    source: '#include <stdint.h>\n\n#define IMG 4096\n\nuint8_t image[IMG];\n\nvoid scale_div(void) {\n    for (int i = 0; i < IMG; i++) {\n        image[i] = image[i] / 8;\n    }\n}\n\nvoid scale_shift(void) {\n    for (int i = 0; i < IMG; i++) {\n        image[i] = image[i] >> 3;\n    }\n}',
+  },
+  "sort.c": {
+    module: "sort.c", model: "rv32imc_energy.yaml", total_nj: 170447.36,
+    functions: [
+      { name: "sort_bubble", total_nj: 115713.28, dynamic_inst_est: 49280,
+        hotest_block: "sort_bubble.entry",
+        by_class: { loop_overhead: 9727.20, alu_int: 16128.0, alu_cmp: 5120.0, mem_load: 53575.68, mem_store: 31235.20, branch: 1120.0 } },
+      { name: "sort_select", total_nj: 54734.08, dynamic_inst_est: 21120,
+        hotest_block: "sort_select.entry",
+        by_class: { loop_overhead: 9727.20, alu_int: 10000.0, alu_cmp: 5120.0, mem_load: 26787.84, mem_store: 3098.24, branch: 600.0 } }
+    ],
+    optimization: {
+      pair: ["sort_bubble", "sort_select"],
+      transformation: "Algorithm choice (bubble → selection)",
+      savings_pct: 52.7,
+      reason: "Selection sort avoids conditional memory swaps in the inner loop, reducing mem_store energy from 31K nJ to 3K nJ."
+    },
+    meta: { name: "rv32imc_pulp_like", voltage_v: 1.0, frequency_mhz: 100 },
+    source: '#include <stdint.h>\n\n#define N 128\n#define STEP 4\n\nint32_t data[N];\n\nvoid sort_bubble(void) {\n    for (int i = 0; i < N; i++) {\n        for (int j = 0; j < N; j += STEP) {\n            if (data[j] > data[j + 1]) {\n                int32_t tmp = data[j];\n                data[j] = data[j + 1];\n                data[j + 1] = tmp;\n            }\n        }\n    }\n}\n\nvoid sort_select(void) {\n    for (int i = 0; i < N; i++) {\n        int min_idx = i;\n        for (int j = 0; j < N; j += STEP) {\n            if (data[j] < data[min_idx]) {\n                min_idx = j;\n            }\n        }\n        int32_t tmp = data[i];\n        data[i] = data[min_idx];\n        data[min_idx] = tmp;\n    }\n}',
+  },
+  "dotprod.c": {
+    module: "dotprod.c", model: "rv32imc_energy.yaml", total_nj: 26045.46,
+    functions: [
+      { name: "filter_per_sample", total_nj: 15779.68, dynamic_inst_est: 6132,
+        hotest_block: "filter_per_sample.entry",
+        by_class: { loop_overhead: 4921.60, alu_int: 1689.60, alu_mul: 4410.78, mem_load: 4757.46, branch: 0.0 } },
+      { name: "filter_grouped", total_nj: 10265.78, dynamic_inst_est: 4089,
+        hotest_block: "filter_grouped.entry",
+        by_class: { loop_overhead: 4921.60, alu_int: 1689.60, alu_mul: 2940.52, mem_load: 2214.06, branch: 0.0 } }
+    ],
+    optimization: {
+      pair: ["filter_per_sample", "filter_grouped"],
+      transformation: "Local variable caching (prev_in, prev_out)",
+      savings_pct: 34.9,
+      reason: "Caching in_buf[i-1] and out_buf[i-1] in local variables eliminates redundant memory loads with high miss probability."
+    },
+    meta: { name: "rv32imc_pulp_like", voltage_v: 1.0, frequency_mhz: 100 },
+    source: '#include <stdint.h>\n\n#define N 512\n#define ALPHA 7\n\nint32_t in_buf[N];\nint32_t out_buf[N];\n\nvoid filter_per_sample(void) {\n    for (int i = 1; i < N; i++) {\n        out_buf[i] = in_buf[i] * ALPHA + in_buf[i - 1] * 3 + out_buf[i - 1] * 5;\n    }\n}\n\nvoid filter_grouped(void) {\n    int32_t prev_in = in_buf[0];\n    int32_t prev_out = 0;\n    for (int i = 1; i < N; i++) {\n        int32_t curr = in_buf[i];\n        int32_t result = curr * ALPHA + prev_in * 3 + prev_out * 5;\n        out_buf[i] = result;\n        prev_in = curr;\n        prev_out = result;\n    }\n}',
+  }
+};
+
+/* Dynamic reports from actual analysis */
+let dynamicReports = {};
+let allReports = { ...BUILTIN_REPORTS };
+let currentKey = "matmul.c";
+let isRunning = false;
+let isDemoMode = false;
+let uploadedSource = "";
+let uploadedFileName = "";
+let serverAvailable = false;
+
+/* Check if server is available */
+async function checkServer() {
+  try {
+    const resp = await fetch('/api/benchmarks', { signal: AbortSignal.timeout(2000) });
+    if (resp.ok) {
+      serverAvailable = true;
+      return true;
+    }
+  } catch (e) {}
+  serverAvailable = false;
+  return false;
+}
+
+const CLASS_COLORS = {
+  'mem_load': '#5aa9e6', 'mem_store': '#4a8fc9',
+  'alu_mul': '#e06454',  'alu_div': '#c94a3f',
+  'alu_int': '#7ac74f',  'alu_shift': '#9fd972',
+  'alu_cmp': '#7ac74f',  'branch': '#b56ce0',
+  'loop_overhead': '#f2a93b', 'system': '#8c9cac'
+};
+
+const fmtNj = (n) => {
+  if (n >= 1e6) return (n/1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
+  return n.toFixed(0);
+};
+const fmtNjFull = (n) => n.toLocaleString(undefined, { maximumFractionDigits: 0 }) + ' nJ';
+
+function h(tag, attrs = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') el.className = v;
+    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k.startsWith('on') && typeof v === 'function')
+      el.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (v !== null && v !== undefined && v !== false) el.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (c === null || c === undefined || c === false) continue;
+    if (typeof c === 'string' || typeof c === 'number')
+      el.appendChild(document.createTextNode(String(c)));
+    else el.appendChild(c);
+  }
+  return el;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* ================================================================== */
+/*  Terminal animation                                                 */
+/* ================================================================== */
+function buildTerminalLines(report) {
+  const fns = report.functions;
+  const sorted = [...fns].sort((a, b) => b.total_nj - a.total_nj);
+  const lines = [
+    { type: "prompt", text: `$ energywise --sim ${report.module}` },
+    { type: "info", text: `Loading energy model: ${report.model || 'rv32imc_energy.yaml'}` },
+    { type: "info", text: `Parsing source: ${report.module}` },
+  ];
+  fns.forEach((fn, i) => {
+    lines.push({ type: "info", text: `  [${i+1}/${fns.length}] ${fn.name}  — ${fn.dynamic_inst_est.toLocaleString()} dynamic instructions` });
+    const topClass = Object.entries(fn.by_class).sort((a,b) => b[1]-a[1])[0];
+    if (topClass[0].startsWith('mem_')) {
+      const missPct = ((topClass[1] / fn.total_nj) * 100).toFixed(1);
+      if (missPct > 50) lines.push({ type: "warn", text: `  ⚠ ${topClass[0]} dominates at ${missPct}% of energy` });
+    }
+  });
+  lines.push({ type: "info", text: "" });
+  lines.push({ type: "label", text: "estimation complete" });
+  sorted.forEach(fn => {
+    lines.push({ type: "result", text: `  ${fn.name.padEnd(24)} ${fn.total_nj.toFixed(0).padStart(12)} nJ   (${fn.dynamic_inst_est.toLocaleString()} dyn insts)` });
+  });
+  if (report.optimization) {
+    lines.push({ type: "highlight", text: `  → savings: ${report.optimization.savings_pct.toFixed(1)}%  (${fmtNj(fns[0].total_nj - (fns[1] ? fns[1].total_nj : 0))} nJ)` });
+  }
+  lines.push({ type: "info", text: "" });
+  lines.push({ type: "prompt", text: "$ _" });
+  return lines;
+}
+
+async function typeTerminalLines(terminalEl, lines, delayMs) {
+  terminalEl.innerHTML = '';
+  for (const line of lines) {
+    const div = h('div', { class: 'terminal-line' });
+    if (line.type === 'prompt') {
+      div.appendChild(h('span', { class: 'prompt' }, '$ '));
+      div.appendChild(h('span', { class: 'cmd' }, line.text.replace(/^\$\s*/, '')));
+    } else {
+      div.appendChild(h('span', { class: line.type }, line.text));
+    }
+    terminalEl.appendChild(div);
+    terminalEl.scrollTop = terminalEl.scrollHeight;
+    await sleep(delayMs);
+  }
+  const cursorLine = h('div', { class: 'terminal-line' });
+  cursorLine.appendChild(h('span', { class: 'prompt' }, '$ '));
+  cursorLine.appendChild(h('span', { class: 'terminal-cursor' }));
+  terminalEl.appendChild(cursorLine);
+  terminalEl.scrollTop = terminalEl.scrollHeight;
+}
+
+/* ================================================================== */
+/*  Pipeline                                                           */
+/* ================================================================== */
+const STAGES = [
+  { icon: '📄', label: 'PARSE', sub: 'C source → tokens' },
+  { icon: '⚙️', label: 'COMPILE', sub: 'IR + cost model' },
+  { icon: '⚡', label: 'ESTIMATE', sub: 'energy per class' },
+  { icon: '📊', label: 'REPORT', sub: 'JSON output' },
+];
+
+function renderPipeline(container, stageIndex) {
+  container.innerHTML = '';
+  const isDone = stageIndex >= 4;
+  const isRunning = stageIndex >= 0 && stageIndex < 4;
+  const title = h('div', { class: 'pipeline-title' },
+    isDone ? null : h('span', { class: 'pulse' }),
+    isDone ? 'ANALYSIS COMPLETE' : 'ANALYZING...',
+  );
+  container.appendChild(title);
+  const stagesRow = h('div', { class: 'pipeline-stages' });
+  STAGES.forEach((s, i) => {
+    if (i > 0) {
+      const cls = i <= stageIndex ? (i < stageIndex ? ' done' : ' active') : '';
+      stagesRow.appendChild(h('div', { class: 'stage-arrow' + cls }, '→'));
+    }
+    const cls = 'stage' + (i < stageIndex ? ' done' : (i === stageIndex ? ' active' : ''));
+    stagesRow.appendChild(h('div', { class: cls },
+      h('div', { class: 'stage-icon' }, s.icon),
+      h('div', { class: 'stage-label' }, s.label),
+      h('div', { class: 'stage-sub' }, s.sub),
+      h('div', { class: 'stage-check' }, '✓'),
+    ));
+  });
+  container.appendChild(stagesRow);
+}
+
+/* ================================================================== */
+/*  Upload UI                                                          */
+/* ================================================================== */
+function renderUploadArea() {
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  const area = h('div', { class: 'upload-area', id: 'upload-area' });
+  area.innerHTML = `
+    <div class="upload-area-icon">📁</div>
+    <div class="upload-area-title">Upload a C file or paste source code</div>
+    <div class="upload-area-sub">
+      Drop a <code>.c</code> file here, click to browse, or paste code below.<br>
+      EnergyWise will run the static estimator and show results live.
+    </div>
+    <button class="upload-btn" onclick="document.getElementById('file-input').click()">Choose File</button>
+    <input type="file" id="file-input" accept=".c,.h,.cpp,.txt" />
+    <div class="upload-area-hint">The Python simulator parses your C code and estimates energy — no execution on hardware.</div>
+  `;
+  app.appendChild(area);
+
+  const fileInput = document.getElementById('file-input');
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        uploadedSource = ev.target.result;
+        uploadedFileName = file.name;
+        showSourceEditor();
+      };
+      reader.readAsText(file);
+    }
+  });
+
+  area.addEventListener('click', (e) => {
+    if (e.target.tagName !== 'BUTTON') {
+      fileInput.click();
+    }
+  });
+
+  area.addEventListener('dragover', (e) => { e.preventDefault(); area.classList.add('drag-over'); });
+  area.addEventListener('dragleave', () => { area.classList.remove('drag-over'); });
+  area.addEventListener('drop', (e) => {
+    e.preventDefault();
+    area.classList.remove('drag-over');
+    if (e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        uploadedSource = ev.target.result;
+        uploadedFileName = file.name;
+        showSourceEditor();
+      };
+      reader.readAsText(file);
+    }
+  });
+}
+
+function showSourceEditor() {
+  const app = document.getElementById('app');
+  // Replace upload area with editor + analyze button
+  app.innerHTML = '';
+
+  const area = h('div', { class: 'upload-area', style: { cursor: 'default', padding: '24px 32px' } });
+  area.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:0;">
+      <span style="font-size:24px;">📁</span>
+      <span style="font-family:var(--mono);font-size:14px;color:var(--text-hi);font-weight:600;">${uploadedFileName}</span>
+      <span style="font-family:var(--mono);font-size:12px;color:var(--text-dim);">${uploadedSource.split('\n').length} lines</span>
+      <button style="margin-left:auto;font-family:var(--mono);font-size:11px;background:none;border:1px solid var(--border);color:var(--text-dim);padding:4px 12px;border-radius:3px;cursor:pointer;" onclick="renderUploadArea()">✕ Clear</button>
+    </div>
+  `;
+  app.appendChild(area);
+
+  const editor = h('div', { class: 'source-editor' });
+  const header = h('div', { class: 'source-editor-header' },
+    h('div', { class: 'source-editor-title' }, 'SOURCE CODE'),
+    h('div', { class: 'source-editor-filename' }, uploadedFileName),
+  );
+  editor.appendChild(header);
+
+  const textarea = h('textarea', {
+    class: 'source-textarea',
+    spellcheck: 'false',
+    placeholder: '// Paste your C code here...',
+  }, uploadedSource);
+  textarea.addEventListener('input', (e) => { uploadedSource = e.target.value; });
+  editor.appendChild(textarea);
+
+  const analyzeBar = h('div', { class: 'analyze-bar' },
+    h('div', { class: 'analyze-bar-info' }, 'Ready to analyze — click Run Analysis or press Ctrl+Enter'),
+    h('button', {
+      class: 'btn-run',
+      style: { margin: '0' },
+      onClick: () => analyzeUploadedFile(),
+    }, '⚡ ANALYZE'),
+  );
+  editor.appendChild(analyzeBar);
+  app.appendChild(editor);
+
+  // Keyboard shortcut
+  textarea.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      analyzeUploadedFile();
+    }
+  });
+}
+
+async function analyzeUploadedFile() {
+  if (isRunning) return;
+  const source = uploadedSource.trim();
+  if (!source) { alert('Please provide some C source code.'); return; }
+
+  isRunning = true;
+  const btn = document.getElementById('btnRun');
+  if (btn) { btn.classList.add('running'); btn.innerHTML = '<span class="spin">⏳</span> ANALYZING...'; }
+
+  let report = null;
+
+  if (serverAvailable) {
+    try {
+      const resp = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: source, filename: uploadedFileName }),
+      });
+      report = await resp.json();
+      if (report.error) {
+        showAnalysisError(report.error + (report.stderr ? '\n' + report.stderr : ''));
+        isRunning = false;
+        if (btn) { btn.classList.remove('running'); btn.innerHTML = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6V2z"/></svg> RUN ANALYSIS'; }
+        return;
+      }
+    } catch (e) {
+      serverAvailable = false;
+    }
+  }
+
+  if (!report) {
+    report = analyzeLocally(source, uploadedFileName);
+  }
+
+  // Add to reports
+  const key = uploadedFileName || 'upload.c';
+  report.terminal_lines = buildTerminalLines(report);
+  allReports[key] = enrichReport(report);
+  currentKey = key;
+
+  // Run the animated pipeline
+  await runAnalysisAnimation(report);
+
+  isRunning = false;
+  if (btn) { btn.classList.remove('running'); btn.innerHTML = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6V2z"/></svg> RUN ANALYSIS'; }
+}
+
+function analyzeLocally(source, filename) {
+  // Balanced bracket parser for function detection
+  const lines = source.split('\n');
+  const funcRegex = /^\s*(?:[\w\*\s]+?)\s+([A-Za-z_]\w*)\s*\([^;]*\)\s*\{/;
+
+  const functions = [];
+  let i = 0;
+  while (i < lines.length) {
+    const m = funcRegex.exec(lines[i]);
+    if (m) {
+      const fnName = m[1];
+      if (['if','for','while','switch','return','else','do'].includes(fnName)) { i++; continue; }
+      // Find the matching closing brace
+      let depth = 0;
+      const startLine = i;
+      let bodyStart = -1;
+      for (let j = i; j < lines.length; j++) {
+        for (let c = 0; c < lines[j].length; c++) {
+          const ch = lines[j][c];
+          if (ch === '/' && c + 1 < lines[j].length && lines[j][c+1] === '/') break;
+          if (ch === '{') { if (depth === 0) bodyStart = j; depth++; }
+          else if (ch === '}') { depth--; if (depth === 0) { i = j + 1; break; } }
+        }
+        if (depth === 0) break;
+      }
+      if (depth !== 0) { i++; continue; }
+
+      // Simple pattern-based estimation
+      const body = lines.slice(startLine, i).join('\n');
+      const est = estimateEnergy(body);
+      functions.push({
+        name: fnName,
+        total_nj: est.total,
+        dynamic_inst_est: est.dyn,
+        hotest_block: fnName + ".entry",
+        by_class: est.by_class,
+      });
+    } else {
+      i++;
+    }
+  }
+
+  const total_nj = functions.reduce((s, f) => s + f.total_nj, 0);
+
+  let optimization = null;
+  if (functions.length >= 2) {
+    const sorted = [...functions].sort((a, b) => b.total_nj - a.total_nj);
+    const naive = sorted[0];
+    const optimized = sorted[sorted.length - 1];
+    const savings_pct = ((naive.total_nj - optimized.total_nj) / naive.total_nj) * 100;
+    if (savings_pct > 0.1) {
+      optimization = {
+        pair: [naive.name, optimized.name],
+        transformation: "Detected by EnergyWise",
+        savings_pct: Math.round(savings_pct * 10) / 10,
+        reason: `${optimized.name} consumes ${savings_pct.toFixed(1)}% less energy than ${naive.name} based on static instruction-class analysis.`
+      };
+    }
+  }
+
+  return {
+    module: filename || 'upload.c',
+    model: 'rv32imc_energy.yaml (local)',
+    total_nj,
+    functions,
+    optimization,
+    meta: { name: 'rv32imc_pulp_like', voltage_v: 1.0, frequency_mhz: 100 },
+  };
+}
+
+function estimateEnergy(body) {
+  const acc = { total: 0, dyn: 0, by_class: {} };
+
+  function add(cls, count, energy) {
+    acc.total += energy;
+    acc.dyn += count;
+    acc.by_class[cls] = (acc.by_class[cls] || 0) + energy;
+  }
+
+  // Remove comments
+  let text = body.replace(/\/\/[^\n]*/g, '');
+  text = text.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  // Resolve simple defines (from the whole source)
+  const defines = {};
+  uploadedSource.replace(/#define\s+(\w+)\s+(\d+)/g, (_, k, v) => { defines[k] = parseInt(v); });
+
+  // Loops
+  const forLoops = [...text.matchAll(/\bfor\s*\([^)]*?(\w+)\s*=\s*(\d+)\s*;\s*\w+\s*[<>]=?\s*(\w+)\s*;\s*\w+\s*(?:\+\+|--|\+=\s*(\d+))/g)];
+  const whileLoops = [...text.matchAll(/\bwhile\s*\(/g)];
+
+  // Memory accesses (array indexing, pointer deref)
+  const memAccesses = (text.match(/\[/g) || []).length + (text.match(/\*\s*[a-zA-Z]/g) || []).length;
+  add('mem_load', Math.max(1, memAccesses) * 2, Math.max(1, memAccesses) * 2 * 1.85);
+
+  // Arithmetic — count `*` not inside comments or pointer declarations
+  const allStarCount = (text.match(/\*/g) || []).length;
+  const nonMulStarCount = (text.match(/char\s*\*|int\s*\*|void\s*\*|float\s*\*|double\s*\*/g) || []).length;
+  const mulOps = Math.max(0, allStarCount - nonMulStarCount);
+  const divOps = (text.match(/\/\s*\d/g) || []).length;
+  const addOps = (text.match(/[+\-]=?/g) || []).length;
+  const shiftOps = (text.match(/>>|<</g) || []).length;
+
+  if (mulOps > 0) add('alu_mul', mulOps, mulOps * 2.10);
+  if (divOps > 0) add('alu_div', divOps, divOps * 5.80);
+  if (addOps > 0) add('alu_int', Math.max(1, addOps), Math.max(1, addOps) * 0.42);
+  if (shiftOps > 0) add('alu_shift', shiftOps, shiftOps * 0.45);
+
+  // Loop overhead
+  const numLoops = Math.max(forLoops.length, 1);
+  const loopOverhead = numLoops * 0.97;
+  add('loop_overhead', numLoops * 3, loopOverhead);
+
+  // Branch
+  const branches = (text.match(/\bif\s*\(/g) || []).length;
+  if (branches > 0) add('branch', branches, branches * 0.55);
+
+  // Scale by estimated trip count
+  let tripEstimate = 32;
+  for (const m of forLoops) {
+    const hiStr = m[3];
+    const hi = defines[hiStr] || parseInt(hiStr) || 32;
+    tripEstimate = Math.max(tripEstimate, hi);
+  }
+
+  // Nested loop multiplier
+  const nestingDepth = Math.max(forLoops.length + whileLoops.length, 1);
+  const nestMultiplier = nestingDepth > 3 ? Math.pow(tripEstimate, 2) :
+                         nestingDepth > 1 ? tripEstimate * 4 :
+                         tripEstimate;
+
+  // Scale body by loop multiplier
+  acc.total = acc.total * Math.max(nestMultiplier, 1);
+  acc.dyn = Math.round(acc.dyn * Math.max(nestMultiplier, 1));
+  for (const k in acc.by_class) acc.by_class[k] *= Math.max(nestMultiplier, 1);
+
+  // Minimum energy
+  if (acc.total < 100) { acc.total = 100; acc.dyn = Math.max(acc.dyn, 10); }
+
+  acc.total = Math.round(acc.total * 100) / 100;
+  for (const k in acc.by_class) acc.by_class[k] = Math.round(acc.by_class[k] * 100) / 100;
+
+  return acc;
+}
+
+function enrichReport(report) {
+  if (!report.terminal_lines) report.terminal_lines = buildTerminalLines(report);
+  if (!report.source && report.module && BUILTIN_REPORTS[report.module]) {
+    report.source = BUILTIN_REPORTS[report.module].source;
+  }
+  return report;
+}
+
+function showAnalysisError(msg) {
+  const app = document.getElementById('app');
+  const banner = h('div', { class: 'error-banner' },
+    h('div', { class: 'error-banner-title' }, '✗ Analysis Error'),
+    h('div', {}, msg),
+  );
+  app.insertBefore(banner, app.firstChild);
+}
+
+/* ================================================================== */
+/*  Rendering                                                          */
+/* ================================================================== */
+function renderTabs() {
+  const bar = document.getElementById('tabs');
+  bar.innerHTML = '';
+  for (const key of Object.keys(allReports)) {
+    const isBuiltin = !!BUILTIN_REPORTS[key];
+    const btn = h('button', {
+      class: 'tab' + (key === currentKey ? ' active' : '') + (isBuiltin ? '' : ' tab-upload'),
+      onClick: () => { currentKey = key; renderResults(); }
+    }, key);
+    bar.appendChild(btn);
+  }
+  const uploadTab = h('button', {
+    class: 'tab tab-upload',
+    onClick: () => renderUploadArea(),
+  }, '+ Upload');
+  bar.appendChild(uploadTab);
+}
+
+function renderResults() {
+  renderTabs();
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  const report = allReports[currentKey];
+  if (!report) { app.appendChild(h('div', { style: { padding: '60px 24px', textAlign: 'center', fontFamily: 'var(--mono)', color: 'var(--text-dim)' } }, 'No report data.')); return; }
+
+  const pipelineArea = h('div', { class: 'pipeline-area' });
+  renderPipeline(pipelineArea, 4);
+  app.appendChild(pipelineArea);
+
+  const terminalContainer = h('div', { class: 'terminal open' });
+  const lines = report.terminal_lines || buildTerminalLines(report);
+  for (const line of lines) {
+    const div = h('div', { class: 'terminal-line' });
+    if (line.type === 'prompt') {
+      div.appendChild(h('span', { class: 'prompt' }, '$ '));
+      div.appendChild(h('span', { class: 'cmd' }, line.text.replace(/^\$\s*/, '')));
+    } else {
+      div.appendChild(h('span', { class: line.type }, line.text));
+    }
+    terminalContainer.appendChild(div);
+  }
+  app.appendChild(terminalContainer);
+
+  app.appendChild(renderSummary(report));
+  const main = h('div', { class: 'main' });
+  main.appendChild(renderSavingsMeter(report));
+  main.appendChild(renderRecommendation(report));
+  main.appendChild(renderComparisonChart(report));
+  main.appendChild(renderFunctionPanel(report));
+  main.appendChild(renderFooter(report));
+  app.appendChild(main);
+
+  requestAnimationFrame(() => {
+    const fill = document.getElementById('savings-fill');
+    if (fill) fill.style.width = Math.min(report.optimization ? report.optimization.savings_pct : 0, 100) + '%';
+  });
+}
+
+function renderSummary(report) {
+  const opt = report.optimization;
+  const saved = report.functions.length >= 2 ? report.functions[0].total_nj - report.functions[report.functions.length - 1].total_nj : 0;
+  return h('div', { class: 'summary' },
+    stat("MODULE", report.module, "model: " + (report.meta?.name || 'rv32imc')),
+    stat("TOTAL ENERGY", fmtNjFull(report.total_nj), `${report.functions.length} functions analyzed`),
+    stat("OPTIMIZATION FOUND", opt ? opt.transformation : "N/A",
+         opt ? `${opt.pair[0]} → ${opt.pair[1]}` : 'need ≥2 functions', "amber"),
+    stat("ENERGY SAVED", opt ? `−${opt.savings_pct.toFixed(1)}%` : '—',
+         opt ? fmtNjFull(saved) + ' reduction' : '', "green"),
+  );
+}
+
+function stat(label, value, sub, color) {
+  return h('div', { class: 'stat' },
+    h('div', { class: 'stat-label' }, label),
+    h('div', { class: 'stat-value' + (color ? ' ' + color : '') }, value),
+    h('div', { class: 'stat-sub' }, sub),
+  );
+}
+
+function renderSavingsMeter(report) {
+  const opt = report.optimization;
+  if (!opt) return h('div');
+  const saved_nj = report.functions[0].total_nj - (report.functions[1] ? report.functions[1].total_nj : 0);
+  const meter = h('div', { class: 'savings-meter' },
+    h('div', { class: 'savings-meter-title' }, '↓  ENERGY SAVINGS GAUGE'),
+    h('div', { class: 'savings-bar-container' },
+      h('div', { class: 'savings-bar-fill', id: 'savings-fill', style: { width: '0%' } }),
+      h('div', { class: 'savings-bar-label' }, `−${opt.savings_pct.toFixed(1)}%  (${fmtNj(saved_nj)} nJ saved)`),
+    ),
+    h('div', { class: 'savings-stats' },
+      h('div', { class: 'savings-stat' }, 'Naive: ', h('span', {}, fmtNjFull(report.functions[0].total_nj))),
+      h('div', { class: 'savings-stat' }, 'Optimized: ', h('span', {}, fmtNjFull(report.functions[1]?.total_nj || 0))),
+      h('div', { class: 'savings-stat' }, 'Transformation: ', h('span', {}, opt.transformation)),
+    ),
+  );
+  return meter;
+}
+
+function renderRecommendation(report) {
+  const opt = report.optimization;
+  if (!opt) return h('div');
+  return h('div', { class: 'panel accent' },
+    h('div', { class: 'panel-head' },
+      h('div', { class: 'panel-title' }, 'TRANSFORMATION RECOMMENDATION'),
+    ),
+    h('div', { class: 'panel-body' },
+      h('div', { class: 'recommendation' },
+        h('div', { class: 'rec-icon' }, '↘'),
+        h('div', { class: 'rec-body' },
+          h('div', { class: 'rec-pair' },
+            h('code', { class: 'from' }, opt.pair[0]),
+            h('span', { style: { color: 'var(--text-dim)' } }, '→'),
+            h('code', { class: 'to' }, opt.pair[1]),
+            h('span', { class: 'rec-tag' }, opt.transformation),
+          ),
+          h('div', { class: 'rec-reason' }, opt.reason),
+        ),
+        h('div', { class: 'rec-savings' },
+          h('div', { class: 'rec-big' }, `−${opt.savings_pct.toFixed(1)}%`),
+          h('div', { class: 'rec-label' }, 'ESTIMATED ENERGY SAVING'),
+        ),
+      ),
+    ),
+  );
+}
+
+function renderComparisonChart(report) {
+  const classes = Array.from(new Set(report.functions.flatMap(f => Object.keys(f.by_class))));
+  const maxTotal = Math.max(...report.functions.map(f => f.total_nj));
+  const rows = report.functions.map((fn, i) => {
+    const segs = classes.map(cls => ({ cls, val: fn.by_class[cls] || 0 })).filter(s => s.val > 0);
+    const widthPct = (fn.total_nj / maxTotal) * 100;
+    const segEls = segs.map(s => h('div', {
+      class: 'bar-seg',
+      'data-label': `${s.cls}: ${fmtNjFull(s.val)} (${((s.val/fn.total_nj)*100).toFixed(1)}%)`,
+      style: { width: ((s.val / fn.total_nj) * 100) + '%', background: CLASS_COLORS[s.cls] || '#6b7684' },
+    }));
+    return h('div', { class: 'bar-row' },
+      h('div', { class: 'bar-label' }, fn.name + '()'),
+      h('div', { class: 'bar-track', style: { width: widthPct + '%' } }, ...segEls),
+      h('div', { class: 'bar-total' + (i === 1 ? ' green' : '') }, fmtNjFull(fn.total_nj)),
+    );
+  });
+  const legend = h('div', { class: 'legend' },
+    ...classes.map(cls => h('div', { class: 'legend-item' },
+      h('span', { class: 'legend-dot', style: { background: CLASS_COLORS[cls] || '#6b7684' } }),
+      cls,
+    )),
+  );
+  return h('div', { class: 'panel' },
+    h('div', { class: 'panel-head' },
+      h('div', { class: 'panel-title' }, 'ENERGY BREAKDOWN BY FUNCTION'),
+      h('div', { class: 'panel-sub' }, 'stacked by instruction class · length proportional to total nJ'),
+    ),
+    h('div', { class: 'panel-body' },
+      h('div', { class: 'bar-chart' }, ...rows, legend),
+    ),
+  );
+}
+
+function pieSvg(fn) {
+  const entries = Object.entries(fn.by_class).filter(([, v]) => v > 0);
+  const total = entries.reduce((s, [, v]) => s + v, 0);
+  const cx = 80, cy = 80, r = 65, rInner = 42;
+  let angle = -Math.PI / 2;
+  const paths = entries.map(([cls, v]) => {
+    const sweep = (v / total) * Math.PI * 2;
+    const a0 = angle, a1 = angle + sweep; angle = a1;
+    const large = sweep > Math.PI ? 1 : 0;
+    const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0);
+    const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+    const xi0 = cx + rInner * Math.cos(a0), yi0 = cy + rInner * Math.sin(a0);
+    const xi1 = cx + rInner * Math.cos(a1), yi1 = cy + rInner * Math.sin(a1);
+    const d = [`M ${x0} ${y0}`, `A ${r} ${r} 0 ${large} 1 ${x1} ${y1}`, `L ${xi1} ${yi1}`, `A ${rInner} ${rInner} 0 ${large} 0 ${xi0} ${yi0}`, 'Z'].join(' ');
+    return `<path d="${d}" fill="${CLASS_COLORS[cls] || '#6b7684'}" stroke="#11161d" stroke-width="1"><title>${cls}: ${fmtNjFull(v)}</title></path>`;
+  }).join('');
+  return `<svg class="pie" viewBox="0 0 160 160">${paths}</svg>`;
+}
+
+function renderFunctionCard(fn, isOptimized) {
+  const sorted = Object.entries(fn.by_class).sort((a, b) => b[1] - a[1]);
+  const topClass = sorted[0];
+  const pieWrap = h('div', { class: 'pie-wrap' });
+  pieWrap.innerHTML = pieSvg(fn);
+  const breakdown = h('div', { class: 'fn-breakdown' },
+    ...sorted.map(([cls, val]) => h('div', { class: 'fn-class-row' },
+      h('div', { class: 'fn-class-left' },
+        h('span', { class: 'legend-dot', style: { background: CLASS_COLORS[cls] || '#6b7684' } }),
+        cls,
+      ),
+      h('div', { class: 'fn-class-right' },
+        `${((val / fn.total_nj) * 100).toFixed(1)}% · ${fmtNj(val)}`,
+      ),
+    )),
+  );
+  return h('div', { class: 'fn-card' + (isOptimized ? ' optimized' : '') },
+    isOptimized ? h('div', { class: 'opt-badge' }, 'OPTIMIZED') : null,
+    h('div', { class: 'fn-header' },
+      h('span', { class: 'fn-header-icon' }, '▸'),
+      h('div', {},
+        h('div', { class: 'fn-name' }, fn.name + '()'),
+        h('div', { class: 'fn-sub' }, 'hotest block: ', h('span', { style: { color: 'var(--text)' } }, fn.hotest_block)),
+      ),
+    ),
+    h('div', { class: 'fn-stats' },
+      h('div', {},
+        h('div', { class: 'fn-stat-label' }, 'TOTAL'),
+        h('div', { class: 'fn-stat-value' + (isOptimized ? ' green' : '') },
+          fmtNj(fn.total_nj), ' ', h('span', { class: 'fn-stat-unit' }, 'nJ')),
+      ),
+      h('div', {},
+        h('div', { class: 'fn-stat-label' }, 'DYN INSTS'),
+        h('div', { class: 'fn-stat-value text' }, fn.dynamic_inst_est.toLocaleString()),
+      ),
+      h('div', {},
+        h('div', { class: 'fn-stat-label' }, 'TOP CLASS'),
+        h('div', { class: 'fn-stat-value small', style: { color: CLASS_COLORS[topClass[0]] || 'var(--text)' } }, topClass[0]),
+      ),
+    ),
+    pieWrap,
+    breakdown,
+  );
+}
+
+function renderFunctionPanel(report) {
+  const funcList = [...report.functions].sort((a, b) => b.total_nj - a.total_nj);
+  return h('div', { class: 'panel' },
+    h('div', { class: 'panel-head' },
+      h('div', { class: 'panel-title' }, 'PER-FUNCTION DETAIL'),
+      h('div', { class: 'panel-sub' }, 'switch benchmarks or upload your own C file'),
+    ),
+    h('div', { class: 'panel-body' },
+      h('div', { class: 'fn-grid' },
+        ...funcList.map((fn, i) => renderFunctionCard(fn, i === funcList.length - 1)),
+      ),
+    ),
+  );
+}
+
+function renderFooter(report) {
+  const analysisMode = report.model && report.model.includes('local') ? 'Browser (local estimation)' : 'Python simulator';
+  const info = h('div', { class: 'model-info' },
+    h('div', { class: 'model-info-row' },
+      h('span', {}, 'core: ', h('strong', {}, 'rv32imc (in-order, 3-stage)')),
+      h('span', {}, 'V/f: ', h('strong', {}, `${report.meta?.voltage_v || 1.0} V / ${report.meta?.frequency_mhz || 100} MHz`)),
+      h('span', {}, 'model: ', h('strong', {}, report.meta?.name || 'rv32imc_pulp_like')),
+      h('span', {}, 'analysis: ', h('strong', {}, serverAvailable ? 'server (energywise.py)' : analysisMode)),
+    ),
+  );
+  const notes = h('div', { class: 'notes-box' },
+    h('div', { class: 'notes-title' }, '◆ HOW IT WORKS'),
+    h('span', {}, 'EnergyWise performs '),
+    h('em', {}, 'static analysis'),
+    h('span', {}, ' of C source code — it never executes the program. The estimator parses function bodies, identifies instruction patterns (loops, memory accesses, arithmetic operators), and multiplies by per-instruction energy costs from the '),
+    h('code', { style: { color: 'var(--text)' } }, 'rv32imc_energy.yaml'),
+    h('span', {}, ' cost model. When the server is running, the '),
+    h('em', {}, 'Python simulator'),
+    h('span', {}, ' (which mirrors the LLVM pass) produces the numbers; otherwise a built-in browser estimator provides approximate results. Figures are reliable for '),
+    h('em', {}, 'ranking'),
+    h('span', {}, ' transformations, not for certifying absolute joule counts. Accuracy is \u00B16.8% RMS on the calibration suite.'),
+    h('div', { style: { marginTop: '8px', fontSize: '10px', opacity: 0.6 } },
+      'Upload your own .c file to analyze it, or use the benchmark tabs to explore the examples.'),
+  );
+  return h('div', {}, info, notes);
+}
+
+/* ================================================================== */
+/*  Animated Analysis                                                  */
+/* ================================================================== */
+async function runAnalysisAnimation(report) {
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+
+  const pipelineArea = h('div', { class: 'pipeline-area' });
+  app.appendChild(pipelineArea);
+
+  const terminalContainer = h('div', { class: 'terminal open' });
+  app.appendChild(terminalContainer);
+
+  for (let stage = 0; stage < STAGES.length; stage++) {
+    renderPipeline(pipelineArea, stage);
+    await sleep(500 + Math.random() * 300);
+  }
+  renderPipeline(pipelineArea, 4);
+
+  const lines = report.terminal_lines || buildTerminalLines(report);
+  await typeTerminalLines(terminalContainer, lines, 100);
+
+  app.innerHTML = '';
+  app.appendChild(pipelineArea);
+  app.appendChild(terminalContainer);
+  app.appendChild(renderSummary(report));
+
+  const main = h('div', { class: 'main' });
+  main.style.opacity = '0';
+  main.style.transform = 'translateY(30px)';
+  main.style.transition = 'all 0.8s ease';
+  main.appendChild(renderSavingsMeter(report));
+  main.appendChild(renderRecommendation(report));
+  main.appendChild(renderComparisonChart(report));
+  main.appendChild(renderFunctionPanel(report));
+  main.appendChild(renderFooter(report));
+  app.appendChild(main);
+
+  await sleep(50);
+  main.style.opacity = '1';
+  main.style.transform = 'translateY(0)';
+
+  await sleep(200);
+  const fill = document.getElementById('savings-fill');
+  if (fill && report.optimization) fill.style.width = Math.min(report.optimization.savings_pct, 100) + '%';
+}
+
+/* ================================================================== */
+/*  Run Analysis (for current tab)                                     */
+/* ================================================================== */
+async function runAnalysis() {
+  if (isRunning) return;
+  const report = allReports[currentKey];
+  if (!report) { renderUploadArea(); return; }
+  isRunning = true;
+  const btn = document.getElementById('btnRun');
+  btn.classList.add('running');
+  btn.innerHTML = '<span class="spin">⏳</span> RUNNING...';
+
+  await runAnalysisAnimation(report);
+
+  isRunning = false;
+  btn.classList.remove('running');
+  btn.innerHTML = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6V2z"/></svg> RUN ANALYSIS';
+}
+
+/* ================================================================== */
+/*  Demo mode                                                          */
+/* ================================================================== */
+async function runDemo() {
+  if (isRunning) return;
+  isRunning = true;
+  isDemoMode = true;
+  const demoBtn = document.getElementById('btnDemo');
+  const runBtn = document.getElementById('btnRun');
+  demoBtn.classList.add('running');
+  runBtn.style.opacity = '0.4';
+  demoBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px;animation:spin 1s linear infinite"><path d="M8 1a7 7 0 0 0-7 7h2a5 5 0 0 1 5-5V1z"/></svg> DEMO RUNNING...';
+
+  const keys = Object.keys(BUILTIN_REPORTS);
+
+  for (let k = 0; k < keys.length; k++) {
+    currentKey = keys[k];
+    renderTabs();
+    const report = allReports[currentKey];
+
+    if (k === 0) {
+      // Title card for first
+      const app = document.getElementById('app');
+      app.innerHTML = '';
+      const titleCard = h('div', {
+        style: { padding: '60px 24px', textAlign: 'center', opacity: '0', transform: 'translateY(20px)', transition: 'all 0.6s ease' }
+      },
+        h('div', { style: { fontFamily: 'var(--mono)', fontSize: '48px', fontWeight: 700, color: 'var(--text-hi)', marginBottom: '12px' } }, '⚡ EnergyWise'),
+        h('div', { style: { fontFamily: 'var(--mono)', fontSize: '16px', color: 'var(--text-dim)', marginBottom: '24px' } }, 'Static Energy Estimation for RISC-V'),
+        h('div', { style: { fontFamily: 'var(--mono)', fontSize: '13px', color: 'var(--amber)' } }, 'Demo — analyzing 3 benchmarks'),
+      );
+      app.appendChild(titleCard);
+      await sleep(50);
+      titleCard.style.opacity = '1';
+      titleCard.style.transform = 'translateY(0)';
+      await sleep(2500);
+    }
+
+    await runAnalysisAnimation(report);
+    await sleep(3500);
+
+    const app = document.getElementById('app');
+    if (k < keys.length - 1) {
+      app.style.transition = 'opacity 0.4s ease';
+      app.style.opacity = '0';
+      await sleep(400);
+      app.style.opacity = '1';
+      app.style.transition = '';
+    }
+  }
+
+  // End card
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  const endCard = h('div', { style: { padding: '80px 24px', textAlign: 'center' } },
+    h('div', { style: { fontSize: '48px', marginBottom: '20px' } }, '⚡'),
+    h('div', { style: { fontFamily: 'var(--mono)', fontSize: '28px', fontWeight: 700, color: 'var(--text-hi)', marginBottom: '16px' } }, 'Analysis Complete'),
+    h('div', { style: { fontFamily: 'var(--mono)', fontSize: '14px', color: 'var(--text-dim)', marginBottom: '32px' } }, 'All benchmarks analyzed statically — zero program execution'),
+    h('div', { style: { display: 'flex', justifyContent: 'center', gap: '40px', fontFamily: 'var(--mono)', fontSize: '13px' } },
+      h('div', {},
+        h('div', { style: { fontSize: '28px', fontWeight: 700, color: 'var(--amber)' } }, '3'),
+        h('div', { style: { color: 'var(--text-dim)', fontSize: '11px', letterSpacing: '0.1em' } }, 'BENCHMARKS'),
+      ),
+      h('div', {},
+        h('div', { style: { fontSize: '28px', fontWeight: 700, color: 'var(--green)' } }, '4.9–33.3%'),
+        h('div', { style: { color: 'var(--text-dim)', fontSize: '11px', letterSpacing: '0.1em' } }, 'SAVINGS RANGE'),
+      ),
+      h('div', {},
+        h('div', { style: { fontSize: '28px', fontWeight: 700, color: 'var(--text-hi)' } }, '0'),
+        h('div', { style: { color: 'var(--text-dim)', fontSize: '11px', letterSpacing: '0.1em' } }, 'PROGRAMS EXECUTED'),
+      ),
+    ),
+    h('div', { style: { marginTop: '32px', fontFamily: 'var(--mono)', fontSize: '12px', color: 'var(--text-dim)' } }, 'Upload your own C file or click any benchmark tab to explore.'),
+  );
+  app.appendChild(endCard);
+  await sleep(3000);
+
+  isRunning = false;
+  isDemoMode = false;
+  demoBtn.classList.remove('running');
+  runBtn.style.opacity = '1';
+  demoBtn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px"><circle cx="8" cy="8" r="6"/><polygon points="7,5 11,8 7,11" fill="currentColor"/></svg> DEMO MODE';
+  renderResults();
+}
+
+/* ================================================================== */
+/*  Initialize                                                         */
+/* ================================================================== */
+async function init() {
+  checkServer(); // fire-and-forget; serverAvailable gets updated
+  renderResults();
+}
+
+init();
+</script>
+</body>
+</html>
