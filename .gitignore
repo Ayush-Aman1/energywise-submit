@@ -3,6 +3,7 @@ __pycache__/
 *.o
 *.so
 *.dylib
+*.ll
 src/build/
 reports/*.json
 energy_report.json
