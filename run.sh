@@ -31,9 +31,12 @@ for tc in testcases/*.c; do
     report="reports/${name}.json"
     echo "--- $tc ---"
     if [ "$MODE" = "native" ]; then
-        python3 "$ROOT/src/energywise.py" "$tc" --mode native --plugin "$ROOT/src/build/libEnergyWise.so" --report "$report" --pretty
+        python3 "$ROOT/src/energywise.py" "$tc" --mode native \
+            --plugin "$ROOT/src/build/libEnergyWise.so" \
+            --report "$report" --pretty
     else
-        python3 "$ROOT/src/energywise.py" "$tc" --mode sim --report "$report" --pretty
+        python3 "$ROOT/src/energywise.py" "$tc" --mode sim \
+            --report "$report" --pretty
     fi
     echo ""
 done

@@ -69,9 +69,8 @@ opt -load-pass-plugin src/build/libEnergyWise.so \
 ├── DESIGN.md
 ├── IMPLEMENTATION.md
 ├── EVALUATION.md
-├── scripts/
-│   ├── build.sh          Build the LLVM plugin + install Python deps
-│   └── run.sh            Run all test cases and print comparison table
+├── build.sh                      Build the LLVM plugin + install Python deps
+├── run.sh                         Run all test cases and print comparison table
 ├── src/
 │   ├── EnergyEstimationPass.cpp   LLVM new-PM plugin (C++17)
 │   ├── CMakeLists.txt             Out-of-tree build for the plugin
@@ -82,8 +81,8 @@ opt -load-pass-plugin src/build/libEnergyWise.so \
 │   ├── fir.c                      FIR filter: naive vs unrolled
 │   ├── matmul.c                   Matrix multiply: naive vs cache-tiled
 │   ├── scale.c                    Brightness scaler: division vs shift
-│   ├── sort.c                     Sorting: bubble vs insertion
-│   └── dotprod.c                  Dot product: naive vs unrolled
+│   ├── sort.c                     Sorting: bubble vs selection
+│   └── dotprod.c                  IIR filter: per-sample vs local-cached
 └── reports/                        Generated JSON reports (output)
 ```
 
