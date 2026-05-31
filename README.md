@@ -144,6 +144,18 @@ The server invokes `src/energywise.py --mode sim` under the hood, so no LLVM ins
 
 ---
 
+## Demo
+
+| File | Description |
+|------|-------------|
+| `Demo/Recording_Demo.mp4` | Video walkthrough: terminal run, web dashboard, and failure case |
+| `Demo/WhatsApp Image 2026-05-31 at 19.02.34.jpeg` | Screenshot: terminal output with comparison table |
+| `Demo/WhatsApp Image 2026-05-31 at 19.02.35.jpeg` | Screenshot: web dashboard showing energy breakdown |
+| `Demo/WhatsApp Image 2026-05-31 at 19.02.35 (1).jpeg` | Screenshot: web dashboard showing optimization recommendation |
+| `CD of 6th sem EL.pptx` | Project presentation slides |
+
+---
+
 ## Project Structure
 
 ```
@@ -156,6 +168,10 @@ The server invokes `src/energywise.py --mode sim` under the hood, so no LLVM ins
 ├── build.bat                      Build LLVM plugin (Windows)
 ├── run.sh                         Run all benchmarks (macOS/Linux)
 ├── run.bat                        Run all benchmarks (Windows)
+├── CD of 6th sem EL.pptx          Project presentation slides
+├── Demo/
+│   ├── Recording_Demo.mp4          Video walkthrough of terminal + dashboard
+│   ├── WhatsApp Image *.jpeg      Screenshots: terminal output and dashboard
 ├── src/
 │   ├── EnergyEstimationPass.cpp   LLVM new-PM plugin (C++17)
 │   ├── CMakeLists.txt             Out-of-tree build for the plugin
