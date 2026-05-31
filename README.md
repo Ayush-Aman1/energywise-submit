@@ -148,10 +148,10 @@ The server invokes `src/energywise.py --mode sim` under the hood, so no LLVM ins
 
 | File | Description |
 |------|-------------|
-| `Demo/Recording_Demo.mp4` | Video walkthrough: terminal run, web dashboard, and failure case |
-| `Demo/WhatsApp Image 2026-05-31 at 19.02.34.jpeg` | Screenshot: terminal output with comparison table |
-| `Demo/WhatsApp Image 2026-05-31 at 19.02.35.jpeg` | Screenshot: web dashboard showing energy breakdown |
-| `Demo/WhatsApp Image 2026-05-31 at 19.02.35 (1).jpeg` | Screenshot: web dashboard showing optimization recommendation |
+| `Demo/Recording_Demo.mp4` | Video walkthrough: web dashboard running the test cases |
+| `Demo/WhatsApp Image 2026-05-31 at 19.02.34.jpeg` | Screenshot: terminal output for the test cases |
+| `Demo/WhatsApp Image 2026-05-31 at 19.02.35.jpeg` | Screenshot: terminal output for the test cases |
+| `Demo/WhatsApp Image 2026-05-31 at 19.02.35 (1).jpeg` | Screenshot: terminal output for the test cases |
 | `CD of 6th sem EL.pptx` | Project presentation slides |
 
 ---
